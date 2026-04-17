@@ -3,12 +3,12 @@
 //
 // How it works:
 //   1. Initialises a full-screen Leaflet map with dark OSM tiles.
-//   2. Loops over all spots from demoSpots.ts and renders a
-//      <SpotMarker /> for each one (which includes its popup).
-//   3. Manages check-in state (which spots the user checked into)
-//      and passes it down so popups can show updated counts.
-//   4. Manages the AddClipModal open/close state.
-//   5. Exposes a "Locate Me" handler via window so the
+//   2. Loads official skatepark data from Supabase on mount.
+//   3. Combines Supabase official spots with local user-added spots.
+//   4. Renders a <SpotMarker /> for each spot (with popup).
+//   5. Manages check-in state (which spots the user checked into).
+//   6. Manages the AddClipModal open/close state.
+//   7. Exposes a "Locate Me" handler via window so the
 //      BottomLeftWidget can trigger it.
 //
 // This is a CLIENT component because Leaflet requires browser APIs.
@@ -25,10 +25,37 @@ import { Spot } from "@/types/spot";
 import { DEMO_SPOTS, DEFAULT_CENTER, DEFAULT_ZOOM } from "@/data/demoSpots";
 import SpotMarker from "./SpotMarker";
 import AddClipModal from "@/components/ui/AddClipModal";
+import { fetchOfficialSpots } from "@/lib/spotsService";
 
 export default function MapView() {
   // Keep a ref to the Leaflet map instance for imperative actions
   const mapRef = useRef<L.Map | null>(null);
+
+  // ---- Supabase data state ----
+  // Official spots loaded from Supabase
+  const [officialSpots, setOfficialSpots] = useState<Spot[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // ---- Fetch official spots from Supabase on mount ----
+  useEffect(() => {
+    fetchOfficialSpots()
+      .then((spots) => {
+        setOfficialSpots(spots);
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error("Failed to load official spots:", error);
+        setLoadError("Failed to load skateparks.");
+        setIsLoading(false);
+      });
+  }, []);
+
+  // ---- Combine official OSM spots with local user spots ----
+  // Filter DEMO_SPOTS to only include user-added spots
+  const userSpots = DEMO_SPOTS.filter((spot) => spot.source === "user");
+  // Merge official + user spots
+  const allSpots = [...officialSpots, ...userSpots];
 
   // ---- Check-in state ----
   // A Set of spot IDs the user has checked into (frontend-only).
@@ -104,7 +131,7 @@ export default function MapView() {
         />
 
         {/* --- One marker per spot --- */}
-        {DEMO_SPOTS.map((spot) => (
+        {allSpots.map((spot) => (
           <SpotMarker
             key={spot.id}
             spot={spot}
@@ -115,6 +142,20 @@ export default function MapView() {
           />
         ))}
       </MapContainer>
+
+      {/* --- Loading indicator --- */}
+      {isLoading && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-zinc-900/90 text-white text-sm rounded-full backdrop-blur">
+          Loading skateparks...
+        </div>
+      )}
+
+      {/* --- Error indicator --- */}
+      {loadError && (
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-red-900/90 text-white text-sm rounded-full backdrop-blur">
+          {loadError}
+        </div>
+      )}
 
       {/* --- Add Clip modal (rendered outside the map) --- */}
       {clipSpot && (

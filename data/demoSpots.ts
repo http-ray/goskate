@@ -1,65 +1,15 @@
 // ============================================================
-// Demo / mock data — hardcoded skate spots used during V1.
-// Replace this with real API calls once a backend is ready.
+// Demo / mock data — local user-added spots.
 //
-// These spots are centered around Los Angeles so the map has
-// a realistic cluster to look at on first load.
+// Official spots now come from Supabase (imported via the
+// OSM import script). Only user-added spots remain here
+// as mock data until user spots are also migrated to Supabase.
 // ============================================================
 
 import { Spot } from "@/types/spot";
 
 export const DEMO_SPOTS: Spot[] = [
-  // ---------- Official spots ----------
-  {
-    id: "official-1",
-    name: "Venice Beach Skatepark",
-    latitude: 33.985,
-    longitude: -118.4695,
-    type: "skatepark",
-    source: "official",
-    clipsCount: 142,
-    activeSkaters: 8,
-  },
-  {
-    id: "official-2",
-    name: "Stoner Skate Plaza",
-    latitude: 34.0365,
-    longitude: -118.4475,
-    type: "skatepark",
-    source: "official",
-    clipsCount: 67,
-    activeSkaters: 3,
-  },
-  {
-    id: "official-3",
-    name: "Hollywood High 16",
-    latitude: 34.1017,
-    longitude: -118.3385,
-    type: "street",
-    source: "official",
-    clipsCount: 231,
-  },
-  {
-    id: "official-4",
-    name: "The Berrics",
-    latitude: 34.0275,
-    longitude: -118.2375,
-    type: "skatepark",
-    source: "official",
-    clipsCount: 512,
-    activeSkaters: 12,
-  },
-  {
-    id: "official-5",
-    name: "Courthouse Ledges (DTLA)",
-    latitude: 34.0503,
-    longitude: -118.2468,
-    type: "street",
-    source: "official",
-    clipsCount: 89,
-  },
-
-  // ---------- User-added spots ----------
+  // ---------- User-added spots (mock / local) ----------
   {
     id: "user-1",
     name: "Santa Monica Gap",
@@ -95,7 +45,8 @@ export const DEFAULT_CENTER: [number, number] = [-118.35, 34.04];
 export const DEFAULT_ZOOM = 11;
 
 /**
- * Look up a single spot by its id.
+ * Look up a single spot by its id in the local mock data.
+ * For Supabase spots, use the spotsService instead.
  * Returns undefined if not found.
  */
 export function getSpotById(id: string): Spot | undefined {

@@ -10,13 +10,15 @@
 //   3. Public Clips — recent clips posted at this spot
 //   4. Get Directions button
 //
-// This is a server component — it reads the spot ID from the
-// URL params and looks everything up in the demo data.
+// Supports both local mock spots (user-*) and Supabase official
+// spots (UUIDs). Falls back to Supabase if not found locally.
 // ============================================================
 
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSpotById, DEMO_SPOTS } from "@/data/demoSpots";
+import { createClient } from "@supabase/supabase-js";
+import type { Spot } from "@/types/spot";
 import {
   getPeopleAtSpot,
   getClipsForSpot,
@@ -25,9 +27,46 @@ import {
   type PublicClip,
 } from "@/data/demoSpotActivity";
 
-// Pre-render all known spot IDs at build time
+// Pre-render local user spot IDs at build time.
+// Supabase spots use dynamic rendering (fetched on demand).
 export function generateStaticParams() {
   return DEMO_SPOTS.map((spot) => ({ id: spot.id }));
+}
+
+// Allow dynamic routes for Supabase spots (UUIDs not pre-rendered)
+export const dynamicParams = true;
+
+/**
+ * Try to find a spot — first in local mock data, then in Supabase.
+ */
+async function findSpot(id: string): Promise<Spot | null> {
+  // Check local mock data first
+  const local = getSpotById(id);
+  if (local) return local;
+
+  // Not found locally — try Supabase
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseKey) return null;
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  const { data, error } = await supabase
+    .from("spots")
+    .select("id, display_name, latitude, longitude, type, source")
+    .eq("id", id)
+    .single();
+
+  if (error || !data) return null;
+
+  return {
+    id: data.id,
+    name: data.display_name,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    type: data.type,
+    source: data.source,
+  };
 }
 
 interface SpotPageProps {
@@ -36,7 +75,7 @@ interface SpotPageProps {
 
 export default async function SpotPage({ params }: SpotPageProps) {
   const { id } = await params;
-  const spot = getSpotById(id);
+  const spot = await findSpot(id);
   if (!spot) return notFound();
 
   const { friends, others } = getPeopleAtSpot(id);

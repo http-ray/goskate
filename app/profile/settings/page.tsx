@@ -10,8 +10,18 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+
+import { supabase } from "@/lib/supabase";
 
 export default function SettingsPage() {
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push("/profile");
+  };
+
   return (
     <div className="min-h-screen bg-black text-white px-5 py-8 font-sans max-w-lg mx-auto">
       {/* ---- Back ---- */}
@@ -29,7 +39,7 @@ export default function SettingsPage() {
         <SettingsRow icon="👤" label="Edit Profile" href="/profile/edit" />
         <SettingsRow icon="🔑" label="Change Password" />
         <SettingsRow icon="📧" label="Email Address" />
-        <SettingsRow icon="🚪" label="Log Out" danger />
+        <SettingsRow icon="🚪" label="Log Out" danger onClick={handleLogout} />
       </SettingsSection>
 
       {/* ---- Notifications ---- */}
@@ -102,11 +112,13 @@ function SettingsRow({
   label,
   href,
   danger,
+  onClick,
 }: {
   icon: string;
   label: string;
   href?: string;
   danger?: boolean;
+  onClick?: () => void;
 }) {
   // If we have a real href, use a link; otherwise a button with a placeholder alert
   const inner = (
@@ -125,6 +137,14 @@ function SettingsRow({
       <Link href={href} className={classes}>
         {inner}
       </Link>
+    );
+  }
+
+  if (onClick) {
+    return (
+      <button onClick={onClick} className={classes}>
+        {inner}
+      </button>
     );
   }
 

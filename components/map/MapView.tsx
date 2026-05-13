@@ -22,14 +22,60 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 import { Spot } from "@/types/spot";
-import { DEMO_SPOTS, DEFAULT_CENTER, DEFAULT_ZOOM } from "@/data/demoSpots";
+import { DEMO_SPOTS } from "@/data/demoSpots";
 import SpotMarker from "./SpotMarker";
 import AddClipModal from "@/components/ui/AddClipModal";
 import { fetchOfficialSpots } from "@/lib/spotsService";
 
+// Keep map navigation focused on the U.S. with a little buffer into
+// Canada and Mexico so edge regions still feel natural to explore.
+//
+// To adjust coverage later:
+// - First point is southwest [lat, lng]
+// - Second point is northeast [lat, lng]
+// - Increase/decrease either latitude or longitude to expand/shrink area
+const US_PADDED_BOUNDS: L.LatLngBoundsExpression = [
+  [14, -150],
+  [60, -52],
+];
+
+// Desktop map behavior (kept aligned with the existing desktop experience).
+const DESKTOP_CENTER: [number, number] = [39.8283, -98.5795]; // [lat, lng]
+const DESKTOP_DEFAULT_ZOOM = 5;
+const DESKTOP_MIN_ZOOM = 4;
+
+// Mobile map behavior.
+// A slightly lower center keeps the U.S. better centered on tall screens
+// and reduces how much Canada appears at zoomed-out levels.
+const MOBILE_CENTER: [number, number] = [37.5, -96.0]; // [lat, lng]
+// Mobile starts a bit farther out for better regional context.
+const MOBILE_DEFAULT_ZOOM = 4;
+// Mobile allows one extra zoom-out step compared to desktop.
+const MOBILE_MIN_ZOOM = 3;
+
 export default function MapView() {
   // Keep a ref to the Leaflet map instance for imperative actions
   const mapRef = useRef<L.Map | null>(null);
+
+  // Detect mobile by viewport width so we can apply mobile map defaults.
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const updateIsMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+
+    updateIsMobile();
+    window.addEventListener("resize", updateIsMobile);
+
+    return () => {
+      window.removeEventListener("resize", updateIsMobile);
+    };
+  }, []);
+
+  const mapCenter = isMobile ? MOBILE_CENTER : DESKTOP_CENTER;
+  const defaultZoom = isMobile ? MOBILE_DEFAULT_ZOOM : DESKTOP_DEFAULT_ZOOM;
+  const minZoom = isMobile ? MOBILE_MIN_ZOOM : DESKTOP_MIN_ZOOM;
 
   // ---- Supabase data state ----
   // Official spots loaded from Supabase
@@ -116,18 +162,27 @@ export default function MapView() {
   return (
     <>
       <MapContainer
-        // Leaflet uses [lat, lng] — our DEFAULT_CENTER is [lng, lat],
-        // so we reverse it here.
-        center={[DEFAULT_CENTER[1], DEFAULT_CENTER[0]]}
-        zoom={DEFAULT_ZOOM}
+        // Leaflet center uses [lat, lng].
+        center={mapCenter}
+        zoom={defaultZoom}
+        // Keep zoom-out bounded per device profile.
+        minZoom={minZoom}
+        // Restrict panning so users stay in the supported region.
+        maxBounds={US_PADDED_BOUNDS}
+        // Higher values create a stronger "rubber-band" near the edge.
+        maxBoundsViscosity={0.9}
         zoomControl={false}
         className="absolute inset-0 z-0 h-full w-full"
         ref={mapRef}
+        // Recreate map when crossing mobile/desktop breakpoint so
+        // the correct initial center/zoom is always applied.
+        key={isMobile ? "mobile-map" : "desktop-map"}
       >
         {/* --- Dark-themed OpenStreetMap tiles --- */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          minZoom={minZoom}
         />
 
         {/* --- One marker per spot --- */}

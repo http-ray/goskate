@@ -21,12 +21,12 @@ const MapView = dynamic(() => import("@/components/map/MapView"), {
 export default function Home() {
   return (
     // The outer div is full viewport, positioned relative so
-    // the map (absolute) fills it and the widget (fixed) floats.
+    // the map (absolute) fills it and the floating controls overlay it.
     <div className="relative h-screen w-screen overflow-hidden bg-black">
       {/* Full-screen map */}
       <MapView />
 
-      {/* Floating buttons in the bottom-left corner */}
+      {/* Responsive floating controls (mobile dock + desktop toolbar) */}
       <BottomLeftWidget />
     </div>
   );

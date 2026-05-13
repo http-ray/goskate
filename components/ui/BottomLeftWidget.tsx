@@ -1,13 +1,17 @@
 // ============================================================
-// BottomLeftWidget — floating action buttons on the map.
+// BottomLeftWidget — responsive floating controls on the map.
 //
-// Currently contains:
+// Layout behavior:
+//   • Mobile: floating bottom dock with Profile / Add / Settings,
+//             plus a separate Locate Me button above the dock.
+//   • Desktop: floating toolbar on the left with Profile / Add / Settings,
+//              and a separate Locate Me button on the left side.
+//
+// Actions currently include:
 //   • "Locate Me"  — flies the map to the user's GPS position
 //   • "Add Spot"   — placeholder button for V2
 //   • "Profile"    — navigates to the profile hub
-//
-// The widget sits in the bottom-left corner and is designed to
-// be thumb-reachable on mobile.
+//   • "Settings"   — navigates to profile settings
 // ============================================================
 
 "use client";
@@ -16,6 +20,7 @@ import { useRouter } from "next/navigation";
 
 export default function BottomLeftWidget() {
   const router = useRouter();
+
   const handleLocateMe = () => {
     // Call the function exposed by MapView on `window`
     const fn = (window as unknown as Record<string, unknown>).__goskate_locateMe;
@@ -27,17 +32,94 @@ export default function BottomLeftWidget() {
     alert("Add Spot coming soon!");
   };
 
+  const controlButtonClass =
+    "flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/80 text-white shadow-lg backdrop-blur transition-transform active:scale-95";
+
   return (
-    <div className="fixed bottom-6 left-4 z-50 flex flex-col gap-3">
-      {/* ---- Locate Me ---- */}
+    <>
+      {/* Desktop: left floating toolbar */}
+      <div className="fixed left-4 top-1/2 z-50 hidden -translate-y-1/2 flex-col gap-3 rounded-3xl border border-white/10 bg-zinc-900/70 p-2 shadow-xl backdrop-blur md:flex">
+        <button
+          onClick={() => router.push("/profile")}
+          aria-label="Profile"
+          className={controlButtonClass}
+        >
+          {/* User icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
+        </button>
+
+        <button
+          onClick={handleAddSpot}
+          aria-label="Add spot"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/90 text-white shadow-lg backdrop-blur transition-transform active:scale-95"
+        >
+          {/* Plus icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="26"
+            height="26"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+        </button>
+
+        <button
+          onClick={() => router.push("/profile/settings")}
+          aria-label="Filters and settings"
+          className={controlButtonClass}
+        >
+          {/* Sliders icon */}
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <line x1="4" y1="21" x2="4" y2="14" />
+            <line x1="4" y1="10" x2="4" y2="3" />
+            <line x1="12" y1="21" x2="12" y2="12" />
+            <line x1="12" y1="8" x2="12" y2="3" />
+            <line x1="20" y1="21" x2="20" y2="16" />
+            <line x1="20" y1="12" x2="20" y2="3" />
+            <line x1="1" y1="14" x2="7" y2="14" />
+            <line x1="9" y1="8" x2="15" y2="8" />
+            <line x1="17" y1="16" x2="23" y2="16" />
+          </svg>
+        </button>
+      </div>
+
+      {/* Mobile: current location button sits above the bottom dock */}
       <button
         onClick={handleLocateMe}
         aria-label="Locate me"
-        className="flex h-12 w-12 items-center justify-center rounded-full
-                   bg-zinc-900/80 text-white shadow-lg backdrop-blur
-                   active:scale-95 transition-transform"
+        className="fixed bottom-28 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/85 text-white shadow-lg backdrop-blur transition-transform active:scale-95 md:hidden"
       >
-        {/* Simple crosshair icon (SVG) */}
+        {/* Crosshair icon */}
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="22"
@@ -57,40 +139,13 @@ export default function BottomLeftWidget() {
         </svg>
       </button>
 
-      {/* ---- Add Spot (placeholder) ---- */}
+      {/* Desktop: current location button stays on the left map controls */}
       <button
-        onClick={handleAddSpot}
-        aria-label="Add spot"
-        className="flex h-12 w-12 items-center justify-center rounded-full
-                   bg-green-500/90 text-white shadow-lg backdrop-blur
-                   active:scale-95 transition-transform"
+        onClick={handleLocateMe}
+        aria-label="Locate me"
+        className="fixed left-4 top-6 z-50 hidden h-12 w-12 items-center justify-center rounded-full bg-zinc-900/85 text-white shadow-lg backdrop-blur transition-transform active:scale-95 md:flex"
       >
-        {/* Plus icon */}
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-      </button>
-
-      {/* ---- Profile ---- */}
-      <button
-        onClick={() => router.push("/profile")}
-        aria-label="Profile"
-        className="flex h-12 w-12 items-center justify-center rounded-full
-                   bg-zinc-900/80 text-white shadow-lg backdrop-blur
-                   active:scale-95 transition-transform"
-      >
-        {/* User icon */}
+        {/* Crosshair icon */}
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="22"
@@ -102,10 +157,91 @@ export default function BottomLeftWidget() {
           strokeLinecap="round"
           strokeLinejoin="round"
         >
-          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-          <circle cx="12" cy="7" r="4" />
+          <circle cx="12" cy="12" r="4" />
+          <line x1="12" y1="2" x2="12" y2="6" />
+          <line x1="12" y1="18" x2="12" y2="22" />
+          <line x1="2" y1="12" x2="6" y2="12" />
+          <line x1="18" y1="12" x2="22" y2="12" />
         </svg>
       </button>
-    </div>
+
+      {/* Mobile: floating bottom dock with thumb-friendly controls */}
+      <div className="fixed inset-x-4 bottom-4 z-50 md:hidden">
+        <div className="grid grid-cols-3 items-end rounded-3xl border border-white/10 bg-zinc-900/75 px-4 pb-3 pt-2 shadow-xl backdrop-blur">
+          <button
+            onClick={() => router.push("/profile")}
+            aria-label="Profile"
+            className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-800/90 text-white shadow-md transition-transform active:scale-95"
+          >
+            {/* User icon */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
+
+          <button
+            onClick={handleAddSpot}
+            aria-label="Add spot"
+            className="mx-auto -mt-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white shadow-xl ring-4 ring-zinc-900/60 transition-transform active:scale-95"
+          >
+            {/* Plus icon */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="30"
+              height="30"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </button>
+
+          <button
+            onClick={() => router.push("/profile/settings")}
+            aria-label="Filters and settings"
+            className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-800/90 text-white shadow-md transition-transform active:scale-95"
+          >
+            {/* Sliders icon */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <line x1="4" y1="21" x2="4" y2="14" />
+              <line x1="4" y1="10" x2="4" y2="3" />
+              <line x1="12" y1="21" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12" y2="3" />
+              <line x1="20" y1="21" x2="20" y2="16" />
+              <line x1="20" y1="12" x2="20" y2="3" />
+              <line x1="1" y1="14" x2="7" y2="14" />
+              <line x1="9" y1="8" x2="15" y2="8" />
+              <line x1="17" y1="16" x2="23" y2="16" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    </>
   );
 }

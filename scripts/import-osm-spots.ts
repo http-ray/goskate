@@ -1,63 +1,51 @@
 // ============================================================
-// OSM Import Script — fetch skateparks from OpenStreetMap and
-// insert them into the Supabase spots table.
+// Google Places Import Script — fetch official skateparks and
+// cache them in the Supabase spots table.
 //
 // Usage:
-//   npx tsx scripts/import-osm-spots.ts            ← imports the active region
-//   npx tsx scripts/import-osm-spots.ts --test      ← tiny test area first
-//   npx tsx scripts/import-osm-spots.ts --all       ← imports every region
+//   npx tsx scripts/import-osm-spots.ts --list-regions
+//   npx tsx scripts/import-osm-spots.ts --region west-la
+//   npx tsx scripts/import-osm-spots.ts --city "Atlanta, GA"
+//   npx tsx scripts/import-osm-spots.ts --bbox 33.93,-118.52,34.08,-118.37
+//   npx tsx scripts/import-osm-spots.ts --all
+//   npx tsx scripts/import-osm-spots.ts --test
 //
 // What it does:
-//   1. Queries the Overpass API for skateparks in one or more
-//      small bounding boxes (regions)
-//   2. Converts each OSM element into a spots table row
-//   3. Upserts rows into Supabase (skips duplicates by osm_id)
-//   4. Marks spots with weak/missing names for future enrichment
+//   1. Calls Google Places Text Search for skateparks
+//   2. Supports imports by predefined region, city name, or bbox
+//   3. Converts each place into the existing spots table shape
+//   4. Upserts into Supabase and skips duplicates by unique place ID
 //
-// Why small regions?
-//   Public Overpass endpoints have strict rate limits and short
-//   timeouts. A single huge bounding box can exceed those limits
-//   and get your request killed (429 / timeout / 504). Splitting
-//   into smaller regions keeps each query fast and well within
-//   the free-tier limits.
-//
-// Requirements:
-//   - .env.local must have NEXT_PUBLIC_SUPABASE_URL and
-//     NEXT_PUBLIC_SUPABASE_ANON_KEY set
-//   - The spots table must already exist (run supabase/schema.sql)
-//   - Install tsx if not present: npm install -D tsx
+// Requirements (.env.local):
+//   - NEXT_PUBLIC_SUPABASE_URL
+//   - NEXT_PUBLIC_SUPABASE_ANON_KEY
+//   - GOOGLE_MAPS_API_KEY
 // ============================================================
 
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import * as path from "path";
 
-// Load .env.local from the project root
 dotenv.config({ path: path.resolve(process.cwd(), ".env.local") });
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const googleMapsApiKey = process.env.GOOGLE_MAPS_API_KEY;
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error(
-    "❌ Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local"
-  );
+if (!supabaseUrl || !supabaseKey || !googleMapsApiKey) {
+  console.error("❌ Missing one or more required env vars in .env.local:");
+  console.error("   - NEXT_PUBLIC_SUPABASE_URL");
+  console.error("   - NEXT_PUBLIC_SUPABASE_ANON_KEY");
+  console.error("   - GOOGLE_MAPS_API_KEY");
   process.exit(1);
 }
 
+const googlePlacesApiKey: string = googleMapsApiKey;
+
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ============================================================
-// REGION CONFIG — edit these to control what gets imported
-//
-// Each region is a small bounding box. Smaller boxes are more
-// reliable because Overpass processes less data per request.
-//
-// To add a new area, just add another entry here.
-// Format: { south, west, north, east } (lat/lon)
-// ============================================================
-
 interface Region {
+  key: string;
   name: string;
   south: number;
   west: number;
@@ -65,9 +53,8 @@ interface Region {
   east: number;
 }
 
-// 🧪 A tiny test region — Venice Beach area only (~3 km²)
-// Use this to confirm the full pipeline works before scaling up.
 const TEST_REGION: Region = {
+  key: "venice-test",
   name: "Venice Beach (test)",
   south: 33.975,
   west: -118.48,
@@ -75,147 +62,44 @@ const TEST_REGION: Region = {
   east: -118.455,
 };
 
-// 📍 Production regions — LA metro split into manageable chunks.
-// Each covers roughly 0.15° × 0.15° (~15 km × 17 km) which is
-// small enough for Overpass to handle quickly.
+// Beginner-friendly region list: edit/add entries here.
 const REGIONS: Region[] = [
-  // West LA / Santa Monica / Venice
-  { name: "West LA",             south: 33.93, west: -118.52, north: 34.08, east: -118.37 },
-  // Central LA / Hollywood / DTLA
-  { name: "Central LA",          south: 33.93, west: -118.37, north: 34.08, east: -118.20 },
-  // East LA / Pasadena
-  { name: "East LA / Pasadena",  south: 34.00, west: -118.20, north: 34.20, east: -118.05 },
-  // South Bay / Torrance / Long Beach
-  { name: "South Bay",           south: 33.73, west: -118.42, north: 33.93, east: -118.15 },
-  // San Fernando Valley (south half)
-  { name: "SFV South",           south: 34.08, west: -118.60, north: 34.22, east: -118.37 },
-  // San Fernando Valley (north half)
-  { name: "SFV North",           south: 34.08, west: -118.37, north: 34.30, east: -118.15 },
+  { key: "west-la", name: "West LA", south: 33.93, west: -118.52, north: 34.08, east: -118.37 },
+  { key: "central-la", name: "Central LA", south: 33.93, west: -118.37, north: 34.08, east: -118.20 },
+  { key: "east-la-pasadena", name: "East LA / Pasadena", south: 34.0, west: -118.2, north: 34.2, east: -118.05 },
+  { key: "south-bay", name: "South Bay", south: 33.73, west: -118.42, north: 33.93, east: -118.15 },
+  { key: "sfv-south", name: "SFV South", south: 34.08, west: -118.6, north: 34.22, east: -118.37 },
+  { key: "sfv-north", name: "SFV North", south: 34.08, west: -118.37, north: 34.3, east: -118.15 },
+  { key: "georgia", name: "Georgia", south: 30.35, west: -85.61, north: 35.0, east: -80.84 },
+  { key: "atlanta", name: "Atlanta", south: 33.4, west: -84.7, north: 34.1, east: -83.9 },
 ];
 
-// ============================================================
-// Overpass endpoint config
-// ============================================================
+const GOOGLE_PLACES_TEXT_SEARCH_URL = "https://places.googleapis.com/v1/places:searchText";
 
-// Multiple Overpass API endpoints (fallback for rate limiting)
-const OVERPASS_ENDPOINTS = [
-  "https://overpass-api.de/api/interpreter",
-  "https://overpass.kumi.systems/api/interpreter",
-  "https://overpass.openstreetmap.ru/api/interpreter",
-];
+// Tuning points for reliability and API quota behavior.
+const DELAY_BETWEEN_TARGETS_MS = 3500;
+const DELAY_BETWEEN_PAGES_MS = 2500;
+const MAX_PAGES_PER_TARGET = 3;
+const PAGE_SIZE = 20;
 
-// Seconds to wait between region fetches (avoids rate limits)
-const DELAY_BETWEEN_REGIONS_MS = 5000;
-
-// ============================================================
-// Overpass API types
-// ============================================================
-
-interface OverpassElement {
-  type: "node" | "way" | "relation";
-  id: number;
-  lat?: number;
-  lon?: number;
-  center?: { lat: number; lon: number };
-  tags?: {
-    name?: string;
-    leisure?: string;
-    sport?: string;
-    "addr:city"?: string;
-    "addr:street"?: string;
-    description?: string;
-    [key: string]: string | undefined;
-  };
+interface GooglePlace {
+  id?: string;
+  displayName?: { text?: string };
+  location?: { latitude?: number; longitude?: number };
+  formattedAddress?: string;
+  types?: string[];
 }
 
-interface OverpassResponse {
-  elements: OverpassElement[];
+interface GooglePlacesResponse {
+  places?: GooglePlace[];
+  nextPageToken?: string;
 }
 
-// ============================================================
-// Step 1: Build the Overpass query for a single region
-// ============================================================
-
-/**
- * Builds an Overpass QL query for skateparks in a bounding box.
- * Queries for:
- *   - leisure=skate_park (dedicated skateparks)
- *   - leisure=pitch + sport=skateboard (multi-use pitches tagged for skating)
- * Uses "out center" so ways/relations return their center coordinates.
- */
-function buildOverpassQuery(region: Region): string {
-  const bbox = `${region.south},${region.west},${region.north},${region.east}`;
-
-  return `
-    [out:json][timeout:15];
-    (
-      node["leisure"="skate_park"](${bbox});
-      way["leisure"="skate_park"](${bbox});
-      relation["leisure"="skate_park"](${bbox});
-      node["leisure"="pitch"]["sport"="skateboard"](${bbox});
-      way["leisure"="pitch"]["sport"="skateboard"](${bbox});
-      relation["leisure"="pitch"]["sport"="skateboard"](${bbox});
-    );
-    out center;
-  `;
+interface FetchResult {
+  ok: boolean;
+  places: GooglePlace[];
+  error?: string;
 }
-
-// ============================================================
-// Step 2: Fetch a single region from Overpass API
-// ============================================================
-
-async function fetchRegion(region: Region): Promise<OverpassElement[]> {
-  const query = buildOverpassQuery(region);
-
-  for (let i = 0; i < OVERPASS_ENDPOINTS.length; i++) {
-    const url = OVERPASS_ENDPOINTS[i];
-    console.log(`    Trying ${new URL(url).hostname}...`);
-
-    try {
-      if (i > 0) {
-        console.log("    Waiting 3s before next endpoint...");
-        await sleep(3000);
-      }
-
-      const response = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `data=${encodeURIComponent(query)}`,
-        signal: AbortSignal.timeout(20_000), // 20s hard timeout per request
-      });
-
-      if (response.status === 429) {
-        console.warn(`    ⚠️  Rate limited (429)`);
-        continue;
-      }
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      const data: OverpassResponse = await response.json();
-      console.log(`    ✅ ${data.elements.length} elements`);
-      return data.elements;
-    } catch (err) {
-      const msg = (err as Error).message;
-      // Detect timeout specifically so it's clear in the output
-      if (msg.includes("abort") || msg.includes("timeout")) {
-        console.error(`    ❌ Timed out on ${new URL(url).hostname}`);
-      } else {
-        console.error(`    ❌ Failed: ${msg}`);
-      }
-    }
-  }
-
-  // All endpoints failed for this region — return empty instead of
-  // crashing the whole import. We'll log a warning and keep going.
-  console.warn(`    ⚠️  All endpoints failed for "${region.name}" — skipping`);
-  return [];
-}
-
-// ============================================================
-// Step 2: Convert OSM elements to Supabase rows
-// ============================================================
 
 interface SpotRow {
   display_name: string;
@@ -228,77 +112,261 @@ interface SpotRow {
   needs_review: boolean;
 }
 
-function convertToRows(elements: OverpassElement[]): SpotRow[] {
-  const rows: SpotRow[] = [];
+interface BBox {
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+}
 
-  for (const el of elements) {
-    // Extract coordinates
-    let lat: number | undefined;
-    let lon: number | undefined;
+interface ImportTarget {
+  kind: "region" | "city" | "bbox";
+  key: string;
+  label: string;
+  city?: string;
+  bbox?: BBox;
+}
 
-    if (el.type === "node" && el.lat !== undefined && el.lon !== undefined) {
-      lat = el.lat;
-      lon = el.lon;
-    } else if (el.center) {
-      lat = el.center.lat;
-      lon = el.center.lon;
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function parseBbox(raw: string): BBox | null {
+  const parts = raw.split(",").map((p) => Number(p.trim()));
+  if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) {
+    return null;
+  }
+
+  const [south, west, north, east] = parts;
+  if (south >= north || west >= east) {
+    return null;
+  }
+
+  return { south, west, north, east };
+}
+
+function buildRegionTarget(region: Region): ImportTarget {
+  return {
+    kind: "region",
+    key: region.key,
+    label: region.name,
+    bbox: {
+      south: region.south,
+      west: region.west,
+      north: region.north,
+      east: region.east,
+    },
+  };
+}
+
+/**
+ * CLI modes:
+ *   --all                              import all predefined regions
+ *   --region west-la                   import one predefined region
+ *   --city "Atlanta, GA"               import one city
+ *   --bbox south,west,north,east       import one custom bounding area
+ *   --test                             import the tiny Venice test region
+ *   --list-regions                     print region keys then exit
+ */
+function getImportTargets(): ImportTarget[] {
+  const args = process.argv.slice(2);
+
+  if (args.includes("--list-regions")) {
+    console.log("Available regions:");
+    for (const region of REGIONS) {
+      console.log(`  - ${region.key} (${region.name})`);
+    }
+    console.log();
+    console.log("Example: npx tsx scripts/import-osm-spots.ts --region west-la");
+    process.exit(0);
+  }
+
+  if (args.includes("--test")) {
+    return [buildRegionTarget(TEST_REGION)];
+  }
+
+  const regionArgIndex = args.findIndex((arg) => arg === "--region");
+  const cityArgIndex = args.findIndex((arg) => arg === "--city");
+  const bboxArgIndex = args.findIndex((arg) => arg === "--bbox");
+
+  const regionValue =
+    regionArgIndex >= 0 ? args[regionArgIndex + 1] : args.find((a) => a.startsWith("--region="))?.split("=").slice(1).join("=");
+  const cityValue =
+    cityArgIndex >= 0 ? args[cityArgIndex + 1] : args.find((a) => a.startsWith("--city="))?.split("=").slice(1).join("=");
+  const bboxValue =
+    bboxArgIndex >= 0 ? args[bboxArgIndex + 1] : args.find((a) => a.startsWith("--bbox="))?.split("=").slice(1).join("=");
+
+  if (regionValue) {
+    const input = regionValue.trim().toLowerCase();
+    const region = REGIONS.find(
+      (r) => r.key.toLowerCase() === input || r.name.toLowerCase() === input
+    );
+
+    if (!region) {
+      console.error(`❌ Unknown region: "${regionValue}"`);
+      console.error("Use --list-regions to see valid regions.");
+      process.exit(1);
     }
 
-    // Skip elements without coordinates
-    if (lat === undefined || lon === undefined) {
+    return [buildRegionTarget(region)];
+  }
+
+  if (cityValue) {
+    const city = cityValue.trim();
+    if (!city) {
+      console.error("❌ --city cannot be empty.");
+      process.exit(1);
+    }
+
+    return [{ kind: "city", key: city.toLowerCase(), label: city, city }];
+  }
+
+  if (bboxValue) {
+    const bbox = parseBbox(bboxValue);
+    if (!bbox) {
+      console.error("❌ Invalid --bbox. Expected format: south,west,north,east");
+      process.exit(1);
+    }
+
+    return [{ kind: "bbox", key: "custom-bbox", label: `BBox ${bboxValue}`, bbox }];
+  }
+
+  // Default (or explicit --all): import all predefined regions.
+  return REGIONS.map(buildRegionTarget);
+}
+
+function buildSearchRequest(target: ImportTarget, pageToken?: string): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    textQuery: target.kind === "city" ? `skatepark in ${target.city}` : "skatepark",
+    pageSize: PAGE_SIZE,
+  };
+
+  if (target.bbox) {
+    base.locationRestriction = {
+      rectangle: {
+        low: { latitude: target.bbox.south, longitude: target.bbox.west },
+        high: { latitude: target.bbox.north, longitude: target.bbox.east },
+      },
+    };
+  }
+
+  if (pageToken) {
+    base.pageToken = pageToken;
+  }
+
+  return base;
+}
+
+function isSkateparkPlace(place: GooglePlace): boolean {
+  const name = place.displayName?.text?.toLowerCase() ?? "";
+  const types = place.types ?? [];
+
+  if (types.includes("skate_park")) {
+    return true;
+  }
+
+  return name.includes("skate");
+}
+
+async function fetchPlacesForTarget(target: ImportTarget): Promise<FetchResult> {
+  const places: GooglePlace[] = [];
+  let nextPageToken: string | undefined;
+
+  for (let page = 1; page <= MAX_PAGES_PER_TARGET; page++) {
+    if (page > 1 && !nextPageToken) {
+      break;
+    }
+
+    if (page > 1) {
+      console.log(`    Waiting ${DELAY_BETWEEN_PAGES_MS / 1000}s before next page token...`);
+      await sleep(DELAY_BETWEEN_PAGES_MS);
+    }
+
+    const body = buildSearchRequest(target, nextPageToken);
+
+    try {
+      const response = await fetch(GOOGLE_PLACES_TEXT_SEARCH_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Goog-Api-Key": googlePlacesApiKey,
+          "X-Goog-FieldMask": "places.id,places.displayName,places.location,places.formattedAddress,places.types,nextPageToken",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(25_000),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        return {
+          ok: false,
+          places,
+          error: `HTTP ${response.status}: ${errorText}`,
+        };
+      }
+
+      const data: GooglePlacesResponse = await response.json();
+      const batch = data.places ?? [];
+      console.log(`    ✅ Page ${page}: ${batch.length} places`);
+      places.push(...batch);
+      nextPageToken = data.nextPageToken;
+    } catch (err) {
+      return {
+        ok: false,
+        places,
+        error: (err as Error).message,
+      };
+    }
+  }
+
+  return { ok: true, places };
+}
+
+function convertPlacesToRows(allPlaces: GooglePlace[]): SpotRow[] {
+  const rowsById = new Map<string, SpotRow>();
+
+  for (const place of allPlaces) {
+    if (!isSkateparkPlace(place)) {
       continue;
     }
 
-    const osmId = `${el.type}/${el.id}`;
-    const osmName = el.tags?.name || null;
+    const placeId = place.id;
+    const lat = place.location?.latitude;
+    const lon = place.location?.longitude;
 
-    // Determine the display name and whether we need review
-    let displayName: string;
-    let needsReview = false;
-
-    if (osmName && osmName.trim().length > 0) {
-      // OSM has a real name — use it as-is
-      // Do NOT append "Skatepark" or any other qualifier
-      displayName = osmName.trim();
-    } else {
-      // No name in OSM — use address info if available, otherwise
-      // set a temporary placeholder and mark for review/enrichment
-      const city = el.tags?.["addr:city"];
-      const street = el.tags?.["addr:street"];
-
-      if (city && street) {
-        displayName = `Skatepark on ${street}, ${city}`;
-        needsReview = true; // address-derived names should be reviewed
-      } else if (street) {
-        displayName = `Skatepark on ${street}`;
-        needsReview = true;
-      } else if (city) {
-        displayName = `Skatepark in ${city}`;
-        needsReview = true;
-      } else {
-        displayName = "Unnamed Skatepark";
-        needsReview = true; // definitely needs enrichment or manual naming
-      }
+    if (!placeId || lat === undefined || lon === undefined) {
+      continue;
     }
 
-    rows.push({
+    const name = place.displayName?.text?.trim() || null;
+    const formattedAddress = place.formattedAddress?.trim() || null;
+
+    let displayName = "Unnamed Skatepark";
+    let needsReview = true;
+
+    if (name) {
+      displayName = name;
+      needsReview = false;
+    } else if (formattedAddress) {
+      displayName = `Skatepark near ${formattedAddress}`;
+      needsReview = true;
+    }
+
+    // Keep existing table shape: store Google unique ID in osm_id for dedupe.
+    rowsById.set(`google_place/${placeId}`, {
       display_name: displayName,
       type: "skatepark",
       source: "official",
       latitude: lat,
       longitude: lon,
-      osm_name: osmName,
-      osm_id: osmId,
+      osm_name: name,
+      osm_id: `google_place/${placeId}`,
       needs_review: needsReview,
     });
   }
 
-  return rows;
+  return Array.from(rowsById.values());
 }
-
-// ============================================================
-// Step 3: Upsert into Supabase
-// ============================================================
 
 async function upsertSpots(rows: SpotRow[]): Promise<void> {
   if (rows.length === 0) {
@@ -306,7 +374,6 @@ async function upsertSpots(rows: SpotRow[]): Promise<void> {
     return;
   }
 
-  // Upsert in batches of 50 to avoid hitting request size limits
   const BATCH_SIZE = 50;
   let inserted = 0;
   let skipped = 0;
@@ -317,13 +384,13 @@ async function upsertSpots(rows: SpotRow[]): Promise<void> {
     const { data, error } = await supabase
       .from("spots")
       .upsert(batch, {
-        onConflict: "osm_id",       // Skip duplicates based on OSM ID
-        ignoreDuplicates: true,      // Don't overwrite existing rows
+        onConflict: "osm_id",
+        ignoreDuplicates: true,
       })
       .select("id");
 
     if (error) {
-      console.error(`  ❌ Batch ${i / BATCH_SIZE + 1} failed:`, error.message);
+      console.error(`  ❌ Batch ${Math.floor(i / BATCH_SIZE) + 1} failed: ${error.message}`);
       skipped += batch.length;
     } else {
       inserted += data?.length ?? 0;
@@ -336,104 +403,74 @@ async function upsertSpots(rows: SpotRow[]): Promise<void> {
   }
 }
 
-// ============================================================
-// Main
-// ============================================================
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Parse CLI flags to decide which regions to import.
- *   --test  → just the tiny Venice Beach test region
- *   --all   → all production regions
- *   (none)  → all production regions (default)
- */
-function getRegionsToImport(): Region[] {
-  const args = process.argv.slice(2);
-
-  if (args.includes("--test")) {
-    return [TEST_REGION];
-  }
-
-  // Default: import all production regions
-  return REGIONS;
-}
-
 async function main() {
-  const regions = getRegionsToImport();
-  const isTest = regions.length === 1 && regions[0] === TEST_REGION;
+  const targets = getImportTargets();
 
-  console.log("🛹 GoSkate — OSM Skatepark Import");
-  console.log("=".repeat(50));
-  if (isTest) {
-    console.log("🧪 TEST MODE — importing only the Venice Beach test area");
-  }
-  console.log(`📍 Regions to import: ${regions.length}`);
-  console.log(regions.map((r) => `   • ${r.name}`).join("\n"));
+  console.log("🛹 GoSkate — Google Places Skatepark Import");
+  console.log("=".repeat(54));
+  console.log(`📍 Targets to import: ${targets.length}`);
+  console.log(targets.map((t) => `   • ${t.label}`).join("\n"));
   console.log();
 
-  // ---- Step 1: Fetch from Overpass, region by region ----
-  console.log("Step 1: Fetching skateparks from OpenStreetMap...");
-  let allElements: OverpassElement[] = [];
-  let failedRegions = 0;
+  const successfulTargets: string[] = [];
+  const failedTargets: Array<{ name: string; reason: string }> = [];
+  const allPlaces: GooglePlace[] = [];
 
-  for (let i = 0; i < regions.length; i++) {
-    const region = regions[i];
-    console.log(`  [${i + 1}/${regions.length}] ${region.name}`);
+  for (let i = 0; i < targets.length; i++) {
+    const target = targets[i];
+    console.log(`  [${i + 1}/${targets.length}] ${target.label}`);
 
-    const elements = await fetchRegion(region);
-    allElements = allElements.concat(elements);
-
-    if (elements.length === 0) {
-      failedRegions++;
+    const result = await fetchPlacesForTarget(target);
+    if (result.ok) {
+      successfulTargets.push(target.label);
+      allPlaces.push(...result.places);
+    } else {
+      failedTargets.push({
+        name: target.label,
+        reason: result.error ?? "unknown Google Places error",
+      });
     }
 
-    // Pause between regions to avoid rate limiting
-    if (i < regions.length - 1) {
-      console.log(`  ⏳ Waiting ${DELAY_BETWEEN_REGIONS_MS / 1000}s before next region...`);
-      await sleep(DELAY_BETWEEN_REGIONS_MS);
+    if (i < targets.length - 1) {
+      console.log(`  ⏳ Waiting ${DELAY_BETWEEN_TARGETS_MS / 1000}s before next target...`);
+      await sleep(DELAY_BETWEEN_TARGETS_MS);
     }
   }
 
   console.log();
-  console.log(`  📊 Total elements fetched: ${allElements.length}`);
-  if (failedRegions > 0) {
-    console.log(`  ⚠️  Failed regions: ${failedRegions} (re-run later to retry)`);
+  console.log(`  📊 Raw places fetched: ${allPlaces.length}`);
+  console.log(`  ✅ Successful targets: ${successfulTargets.length}`);
+  console.log(`  ⚠️  Failed targets: ${failedTargets.length}`);
+  if (failedTargets.length > 0) {
+    console.log("  Failed target details:");
+    for (const failed of failedTargets) {
+      console.log(`   • ${failed.name}`);
+      console.log(`     Reason: ${failed.reason}`);
+    }
   }
   console.log();
 
-  if (allElements.length === 0) {
-    console.log("❌ No data fetched. Check your internet or try again later.");
+  if (allPlaces.length === 0) {
+    console.log("❌ No places fetched. Check GOOGLE_MAPS_API_KEY, billing, and API enablement.");
     process.exit(1);
   }
 
-  // ---- Step 2: Convert to rows ----
-  console.log("Step 2: Converting to database rows...");
-  const rows = convertToRows(allElements);
-  console.log(`  📊 Total rows: ${rows.length}`);
+  console.log("Step 2: Normalizing places into spots rows...");
+  const rows = convertPlacesToRows(allPlaces);
+  console.log(`  📊 Rows after dedupe/filtering: ${rows.length}`);
   console.log(`  📝 Need review: ${rows.filter((r) => r.needs_review).length}`);
   console.log(`  ✅ Have names: ${rows.filter((r) => r.osm_name).length}`);
   console.log();
 
-  // ---- Step 3: Upsert into Supabase ----
-  console.log("Step 3: Upserting into Supabase...");
+  console.log("Step 3: Caching official spots in Supabase...");
   await upsertSpots(rows);
   console.log();
 
   console.log("🎉 Import complete!");
-  console.log();
-  if (isTest) {
-    console.log("Test import worked! Next: run without --test to import all regions:");
-    console.log("  npx tsx scripts/import-osm-spots.ts");
-  } else {
-    console.log("Next steps:");
-    console.log("  1. Check your Supabase table for imported spots");
-    console.log('  2. Filter by needs_review = true to find spots needing better names');
-    console.log("  3. Run scripts/enrich-spots.ts to attempt Google Places enrichment");
-    console.log("  4. Manually review uncertain results in Supabase table editor");
-  }
+  console.log("Retry examples:");
+  console.log("  npx tsx scripts/import-osm-spots.ts --region west-la");
+  console.log('  npx tsx scripts/import-osm-spots.ts --city "Atlanta, GA"');
+  console.log("  npx tsx scripts/import-osm-spots.ts --bbox 33.93,-118.52,34.08,-118.37");
 }
 
 main().catch((err) => {

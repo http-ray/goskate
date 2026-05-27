@@ -1,0 +1,168 @@
+"use client";
+
+// ============================================================
+// UserBannerCard
+//
+// A reusable profile card showing a user's banner image,
+// avatar, name, and skate stats.
+//
+// Used on:
+//   - /profile (logged-in user's own card)
+//   - Future: map spot popups showing nearby skaters
+//   - Future: friend search results
+//
+// Props:
+//   profile       — a Profile object from profilesService
+//   onClipsClick  — optional; renders a "View Clips" button
+//                   when provided (leave undefined to hide it)
+// ============================================================
+
+import type { Profile } from "@/lib/profilesService";
+
+type UserBannerCardProps = {
+  profile: Profile;
+  /** Optional — show a "View Clips" button that calls this when tapped. */
+  onClipsClick?: () => void;
+};
+
+export default function UserBannerCard({
+  profile,
+  onClipsClick,
+}: UserBannerCardProps) {
+  // Prefer display_name, fall back to username, then a generic placeholder
+  const displayName = profile.display_name || profile.username || "GoSkater";
+  const handle = profile.username ? `@${profile.username}` : null;
+
+  return (
+    <div className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/80 shadow-2xl backdrop-blur">
+
+      {/* ============================================================
+          Banner
+          Uses banner_url when available; falls back to a gradient.
+          ============================================================ */}
+      <div
+        className="relative h-28 w-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black"
+        style={
+          profile.banner_url
+            ? {
+                backgroundImage: `url(${profile.banner_url})`,
+                backgroundSize: "cover",
+                backgroundPosition: "center",
+              }
+            : undefined
+        }
+      >
+        {/* Avatar — positioned so it overlaps the bottom edge of the banner */}
+        <div className="absolute -bottom-10 left-5">
+          {profile.avatar_url ? (
+            <img
+              src={profile.avatar_url}
+              alt={`${displayName}'s avatar`}
+              className="h-20 w-20 rounded-full border-4 border-black object-cover"
+            />
+          ) : (
+            // Initial letter fallback
+            <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-black bg-zinc-800 text-3xl font-bold text-zinc-300">
+              {displayName[0]?.toUpperCase() ?? "G"}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ============================================================
+          Name, handle, bio, stats
+          pt-12 gives room for the avatar that overlaps the banner.
+          ============================================================ */}
+      <div className="px-5 pb-5 pt-12">
+
+        {/* Name row */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="truncate text-xl font-bold leading-tight">
+              {displayName}
+            </h2>
+            {handle && (
+              <p className="text-sm text-zinc-500">{handle}</p>
+            )}
+          </div>
+
+          {/* Private badge — shown when profile.is_public is false */}
+          {!profile.is_public && (
+            <span className="shrink-0 rounded-full border border-zinc-700 px-2.5 py-0.5 text-xs text-zinc-500">
+              Private
+            </span>
+          )}
+        </div>
+
+        {/* Bio */}
+        {profile.bio && (
+          <p className="mt-2 text-sm leading-6 text-zinc-400">{profile.bio}</p>
+        )}
+
+        {/* ============================================================
+            Stats row
+            Only shows pills for values that have been set.
+            ============================================================ */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {profile.parks_visited_count > 0 && (
+            <StatPill
+              icon="📍"
+              label="Parks"
+              value={String(profile.parks_visited_count)}
+            />
+          )}
+          {profile.stance && (
+            <StatPill
+              icon="🛹"
+              label="Stance"
+              value={capitalise(profile.stance)}
+            />
+          )}
+          {profile.local_park && (
+            <StatPill icon="🏠" label="Local" value={profile.local_park} />
+          )}
+        </div>
+
+        {/* ============================================================
+            Clips button — placeholder for V1.
+            Only rendered when onClipsClick is provided.
+            ============================================================ */}
+        {onClipsClick && (
+          <button
+            type="button"
+            onClick={onClipsClick}
+            className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 active:scale-[0.99]"
+          >
+            View Clips
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// StatPill — small labelled chip used in the stats row
+// ============================================================
+function StatPill({
+  icon,
+  label,
+  value,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-zinc-900 px-3 py-1.5 text-sm">
+      <span aria-hidden="true">{icon}</span>
+      <span className="text-zinc-500">{label}:</span>
+      <span className="font-medium text-white">{value}</span>
+    </div>
+  );
+}
+
+// Capitalise first letter only (e.g. "regular" → "Regular")
+function capitalise(str: string): string {
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}

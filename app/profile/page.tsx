@@ -3,26 +3,32 @@
 // ============================================================
 // Profile Hub — /profile
 //
-// This page is the simple auth entry point for V1.
-// If the user is signed out, it shows sign up / log in forms.
-// If the user is signed in, it shows a lightweight profile card
-// with editable username and avatar URL stored in Supabase auth
-// metadata.
+// Two states:
+//   Signed out → shows login / signup forms (Supabase Auth).
+//   Signed in  → loads the user's profile row from the profiles
+//                table and displays it in a UserBannerCard.
+//
+// Auth is handled entirely by Supabase. The profile row is a
+// separate table linked to auth.users by the same user id.
+// On first login ensureProfile() creates the row automatically.
 // ============================================================
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
+import { ensureProfile, type Profile } from "@/lib/profilesService";
+import UserBannerCard from "@/components/ui/UserBannerCard";
 
 type Mode = "login" | "signup";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
 
+  // ---- Auth form state (only used when signed out) ----
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -32,36 +38,30 @@ export default function ProfilePage() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const currentUsername = useMemo(() => {
-    const metadataUsername = user?.user_metadata?.username;
-    if (typeof metadataUsername === "string" && metadataUsername.trim()) {
-      return metadataUsername.trim();
-    }
+  // ---- Profile state (only used when signed in) ----
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
-    if (user?.email) {
-      return user.email.split("@")[0];
-    }
-
-    return "GoSkater";
-  }, [user]);
-
-  const currentAvatarUrl = useMemo(() => {
-    const metadataAvatar = user?.user_metadata?.avatar_url;
-    return typeof metadataAvatar === "string" ? metadataAvatar : "";
-  }, [user]);
-
+  // When the auth user resolves, load or auto-create their profile row.
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setProfile(null);
+      return;
+    }
 
-    const metadataUsername = user.user_metadata?.username;
-    const metadataAvatar = user.user_metadata?.avatar_url;
+    setProfileLoading(true);
+    setProfileError(null);
 
-    setUsername(
-      typeof metadataUsername === "string" ? metadataUsername : currentUsername
-    );
-    setAvatarUrl(typeof metadataAvatar === "string" ? metadataAvatar : "");
-    setEmail(user.email ?? "");
-  }, [currentUsername, user]);
+    ensureProfile(user)
+      .then(setProfile)
+      .catch((err: unknown) => {
+        setProfileError(
+          err instanceof Error ? err.message : "Could not load profile."
+        );
+      })
+      .finally(() => setProfileLoading(false));
+  }, [user]);
 
   async function handleAuthSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -107,52 +107,26 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleSaveProfile() {
-    setError(null);
-    setMessage(null);
-    setSaving(true);
-
-    try {
-      const { error: updateError } = await supabase.auth.updateUser({
-        data: {
-          username: username.trim() || currentUsername,
-          avatar_url: avatarUrl.trim() || null,
-        },
-      });
-
-      if (updateError) throw updateError;
-
-      setMessage("Profile updated.");
-    } catch (updateProfileError) {
-      setError(
-        updateProfileError instanceof Error
-          ? updateProfileError.message
-          : "Could not update profile."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
   async function handleLogout() {
     setError(null);
-    setMessage(null);
     setSaving(true);
-
     try {
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) throw signOutError;
       router.push("/");
     } catch (signOutError) {
       setError(
-        signOutError instanceof Error ? signOutError.message : "Could not log out."
+        signOutError instanceof Error
+          ? signOutError.message
+          : "Could not log out."
       );
     } finally {
       setSaving(false);
     }
   }
 
-  if (loading) {
+  // ---- Auth loading ----
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-black px-5 py-8 text-white">
         <div className="mx-auto flex min-h-[70vh] max-w-lg items-center justify-center rounded-3xl border border-white/10 bg-zinc-950/80 p-6 text-sm text-zinc-400 backdrop-blur">
@@ -162,6 +136,7 @@ export default function ProfilePage() {
     );
   }
 
+  // ---- Signed out — show auth form ----
   if (!user) {
     return (
       <div className="min-h-screen bg-black px-5 py-8 text-white">
@@ -264,106 +239,77 @@ export default function ProfilePage() {
     );
   }
 
+  // ---- Signed in — show real profile from Supabase profiles table ----
   return (
     <div className="min-h-screen bg-black px-5 py-8 text-white">
-      <div className="mx-auto max-w-lg">
+      <div className="mx-auto max-w-lg space-y-4">
         <Link
           href="/"
-          className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors hover:text-white"
+          className="inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors hover:text-white"
         >
           ← Back to map
         </Link>
 
-        <div className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/80 shadow-2xl backdrop-blur">
-          <div className="bg-gradient-to-br from-zinc-900 via-zinc-950 to-black px-5 py-6">
-            <div className="flex items-center gap-4">
-              {currentAvatarUrl ? (
-                // Use the user's image when available.
-                <img
-                  src={currentAvatarUrl}
-                  alt="Profile image"
-                  className="h-20 w-20 rounded-full border border-white/10 object-cover"
-                />
-              ) : (
-                // Placeholder image style: simple avatar circle with an initial.
-                <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-zinc-800 text-3xl font-bold text-zinc-300">
-                  {currentUsername[0]?.toUpperCase() ?? "G"}
-                </div>
-              )}
-
-              <div className="min-w-0">
-                <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
-                  Signed in
-                </p>
-                <h1 className="truncate text-2xl font-bold">{currentUsername}</h1>
-                <p className="truncate text-sm text-zinc-400">{user.email}</p>
-              </div>
-            </div>
+        {/* Profile card loading / error states */}
+        {profileLoading && (
+          <div className="rounded-3xl border border-white/10 bg-zinc-950/80 p-6 text-sm text-zinc-400 backdrop-blur">
+            Loading profile...
           </div>
+        )}
 
-          <div className="space-y-5 px-5 py-5">
-            <div className="rounded-2xl border border-white/10 bg-zinc-900/70 p-4">
-              <p className="text-sm font-semibold">Profile details</p>
-              <p className="mt-1 text-sm leading-6 text-zinc-400">
-                Username and avatar image live in Supabase Auth metadata for now.
-                That keeps the auth flow simple until a dedicated profiles table
-                is needed.
-              </p>
-            </div>
-
-            <div className="space-y-4">
-              <Field
-                label="Username"
-                value={username}
-                onChange={setUsername}
-                prefix="@"
-              />
-              <Field
-                label="Profile Image URL"
-                value={avatarUrl}
-                onChange={setAvatarUrl}
-                placeholder="https://..."
-              />
-            </div>
-
-            {error && (
-              <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-                {error}
-              </div>
-            )}
-
-            {message && (
-              <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                {message}
-              </div>
-            )}
-
-            <div className="grid gap-3">
-              <button
-                type="button"
-                onClick={handleSaveProfile}
-                disabled={saving}
-                className="w-full rounded-2xl bg-green-500 px-4 py-3 text-sm font-semibold text-black transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {saving ? "Saving..." : "Save profile"}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleLogout}
-                disabled={saving}
-                className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Log out
-              </button>
-            </div>
+        {profileError && (
+          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            {profileError}
           </div>
+        )}
+
+        {/* Real profile card — renders once the profile row is loaded */}
+        {profile && (
+          <UserBannerCard
+            profile={profile}
+            onClipsClick={() => alert("Clips coming soon!")}
+          />
+        )}
+
+        {/* Action buttons */}
+        <div className="grid gap-3">
+          <Link
+            href="/profile/edit"
+            className="block w-full rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-black transition-transform active:scale-[0.99]"
+          >
+            Edit Profile
+          </Link>
+
+          <Link
+            href="/profile/settings"
+            className="block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-white/10"
+          >
+            Settings
+          </Link>
+
+          {error && (
+            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={saving}
+            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-400 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? "Signing out..." : "Log out"}
+          </button>
         </div>
       </div>
     </div>
   );
 }
 
+// ============================================================
+// Reusable text input — used by the auth form only
+// ============================================================
 function Field({
   label,
   value,

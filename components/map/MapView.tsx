@@ -25,6 +25,7 @@ import { Spot } from "@/types/spot";
 import { DEMO_SPOTS } from "@/data/demoSpots";
 import SpotMarker from "./SpotMarker";
 import AddClipModal from "@/components/ui/AddClipModal";
+import VisibleSpotsPanel from "@/components/ui/VisibleSpotsPanel";
 import { fetchOfficialSpots } from "@/lib/spotsService";
 
 // Keep map navigation focused on the U.S. with a little buffer into
@@ -119,6 +120,11 @@ export default function MapView() {
     });
   }, []);
 
+  // ---- Visible spots state ----
+  // Tracks which spots fall inside the current map viewport.
+  // Updated whenever the user pans or zooms via the moveend/zoomend effect below.
+  const [visibleSpots, setVisibleSpots] = useState<Spot[]>([]);
+
   // ---- Add Clip modal state ----
   const [clipSpot, setClipSpot] = useState<Spot | null>(null);
 
@@ -158,6 +164,52 @@ export default function MapView() {
       delete (window as unknown as Record<string, unknown>).__goskate_locateMe;
     };
   }, [handleLocateMe]);
+
+  // ---- Visible spots — recalculate when spots load or map changes ----
+  //
+  // How it works:
+  //   1. After the map mounts (mapRef.current is set by React's commit phase
+  //      before any useEffect runs), we register moveend + zoomend listeners.
+  //   2. Each listener filters allSpots against the current Leaflet bounds
+  //      using map.getBounds().contains([lat, lng]).
+  //   3. The effect re-runs when allSpots changes (Supabase data loads) so the
+  //      initial visible set is calculated as soon as spots are available.
+  //   4. isMobile is included so the effect re-runs when the map is recreated
+  //      after a mobile/desktop breakpoint crossing.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    // Calculate which spots are inside the current viewport
+    function updateVisible() {
+      const bounds = map!.getBounds();
+      const visible = allSpots.filter((spot) =>
+        bounds.contains([spot.latitude, spot.longitude])
+      );
+      setVisibleSpots(visible);
+    }
+
+    // Run once immediately so the panel is populated on load
+    updateVisible();
+
+    // Re-run every time the user pans or zooms
+    map.on("moveend", updateVisible);
+    map.on("zoomend", updateVisible);
+
+    // Cleanup: remove only our specific listeners on re-run or unmount
+    return () => {
+      map.off("moveend", updateVisible);
+      map.off("zoomend", updateVisible);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allSpots, isMobile]);
+
+  // ---- Fly to a spot when the user taps it in the panel ----
+  const handleFlyToSpot = useCallback((spot: Spot) => {
+    mapRef.current?.flyTo([spot.latitude, spot.longitude], 15, {
+      duration: 1.2,
+    });
+  }, []);
 
   return (
     <>
@@ -216,6 +268,11 @@ export default function MapView() {
       {clipSpot && (
         <AddClipModal spot={clipSpot} onClose={handleCloseAddClip} />
       )}
+
+      {/* --- Visible spots panel ---
+           Mobile: collapsed pill above the bottom dock, expands to sheet.
+           Desktop: right-side floating panel, always visible. */}
+      <VisibleSpotsPanel spots={visibleSpots} onSpotClick={handleFlyToSpot} />
     </>
   );
 }

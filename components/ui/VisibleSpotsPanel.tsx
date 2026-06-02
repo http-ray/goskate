@@ -138,13 +138,16 @@ export default function VisibleSpotsPanel({
       {/* Collapsed pill — sits above the mobile bottom dock.
           Uses right-20 to avoid overlapping the Locate Me button
           which lives at bottom-28 right-4.
-          Hidden while the sheet is open. */}
+          Hidden while the sheet is open.
+          pointer-events-none on the outer div means transparent areas
+          of this container do NOT block map taps.  pointer-events-auto
+          on the button re-enables interaction only on the visible pill. */}
       {!isOpen && (
-        <div className="fixed bottom-[100px] left-4 right-20 z-[450] md:hidden">
+        <div className="pointer-events-none fixed bottom-[100px] left-4 right-20 z-[450] md:hidden">
           <button
             onClick={() => setIsOpen(true)}
             aria-label={`${count} spots in view — tap to expand`}
-            className="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-zinc-900/90 px-4 py-3 shadow-xl backdrop-blur"
+            className="pointer-events-auto flex w-full items-center justify-between rounded-2xl border border-white/10 bg-zinc-900/90 px-4 py-3 shadow-xl backdrop-blur"
           >
             <span className="text-sm font-medium text-white">
               🛹&nbsp;{count} spot{count !== 1 ? "s" : ""} in view

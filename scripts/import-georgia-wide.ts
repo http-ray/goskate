@@ -158,6 +158,7 @@ interface SpotRow {
   osm_name: string | null;
   osm_id: string;
   needs_review: boolean;
+  area_text?: string;
 }
 
 // ============================================================
@@ -178,6 +179,35 @@ function isSkateparkPlace(place: GooglePlace): boolean {
   const name = (place.displayName?.text ?? "").toLowerCase();
   const types = place.types ?? [];
   return types.includes("skate_park") || name.includes("skate");
+}
+
+type NamedArea = {
+  label: string;
+  south: number;
+  west: number;
+  north: number;
+  east: number;
+};
+
+// Region labels used by the visible-spots panel grouping.
+const GEORGIA_NAMED_AREAS: NamedArea[] = [
+  { label: "Atlanta Metro", south: 33.2, west: -84.9, north: 34.1, east: -84.2 },
+  { label: "Gwinnett / Lawrenceville", south: 33.8, west: -84.25, north: 34.15, east: -83.8 },
+  { label: "Athens", south: 33.85, west: -83.55, north: 34.1, east: -83.25 },
+  { label: "Gainesville / Jefferson", south: 34.1, west: -83.9, north: 34.55, east: -83.4 },
+  { label: "Savannah", south: 31.85, west: -81.4, north: 32.3, east: -80.85 },
+  { label: "Augusta", south: 33.2, west: -82.3, north: 33.65, east: -81.85 },
+  { label: "Macon", south: 32.65, west: -83.9, north: 32.95, east: -83.5 },
+];
+
+function deriveGeorgiaAreaLabel(lat: number, lng: number): string | undefined {
+  for (const area of GEORGIA_NAMED_AREAS) {
+    const inLat = lat >= area.south && lat <= area.north;
+    const inLng = lng >= area.west && lng <= area.east;
+    if (inLat && inLng) return area.label;
+  }
+
+  return undefined;
 }
 
 /**
@@ -221,6 +251,7 @@ function placeToRow(place: GooglePlace): SpotRow | null {
     // same park was already imported it is treated as a duplicate.
     osm_id: `google_place/${placeId}`,
     needs_review: needsReview,
+    area_text: deriveGeorgiaAreaLabel(lat, lon),
   };
 }
 

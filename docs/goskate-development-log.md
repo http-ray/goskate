@@ -278,3 +278,213 @@ React Leaflet v5 uses a React context to pass the map instance and parent layer 
 4. **External-link clip system** — the next major feature after this session.
 
 ---
+
+## Session: MVP Moderation Pipeline, Access Fixes, and Visible Panel Revert
+
+**Date:** June 8, 2026  
+**Areas touched:** spot submission flow, moderation schema/workflow, admin access checks, settings cleanup direction, visible spots panel UX decisions
+
+---
+
+### 1. Session Overview
+
+This session continued preparing GoSkate for MVP deployment with a strong focus on practical backend workflow and lower operational risk.
+
+- Continued preparing GoSkate for MVP deployment.
+- Focused on user-submitted skate spots and moderation workflow.
+- Fixed admin review access issues.
+- Reviewed Visible Spots Panel improvements and reverted area grouping/tabs for now.
+- Discussed keeping MVP focused before larger UI redesign work.
+
+Why this mattered:
+- MVP needs reliable core flows (submit, review, approve) more than advanced categorization UI.
+- Stability and moderation controls are more valuable at launch than polish features that depend on incomplete data.
+
+---
+
+### 2. Add Spot / Moderation Pipeline
+
+GoSkate now supports a moderation-first submission pipeline rather than simple direct-write CRUD.
+
+- Users can submit either skatepark or street spots.
+- Submissions are saved in the `spots` table.
+- User-submitted spots are written with:
+  - `source = "user"`
+  - `status = "pending"`
+  - `created_by = current authenticated user id`
+- Spot lifecycle states are:
+  - `pending`
+  - `approved`
+  - `rejected`
+  - `flagged`
+- Approved user spots can appear publicly.
+- Pending/rejected/flagged spots stay hidden from the public map.
+
+Why this is stronger than simple CRUD:
+- It prevents bad or duplicate spots from becoming public immediately.
+- It creates a clear audit path (`reviewed_by`, `reviewed_at`, `moderation_notes`).
+- It makes community submissions safe to scale.
+
+---
+
+### 3. Database Updates
+
+The `spots` table was extended for moderation and review.
+
+Added/used moderation fields:
+- `status`
+- `created_by`
+- `description`
+- `obstacle_tags`
+- `area_text`
+- `moderation_notes`
+- `reviewed_by`
+- `reviewed_at`
+- `possible_duplicate`
+
+Why defaults were chosen this way:
+- Existing official spots default to `approved` because they are imported baseline data and should remain visible.
+- New user submissions default to `pending` so admins can verify quality before publishing.
+
+How this helps future workflows:
+- Enables admin review UI and status transitions.
+- Supports duplicate checks and moderation notes without schema redesign.
+- Keeps public read logic simple (`status = approved`).
+
+---
+
+### 4. Admin Review Page
+
+The admin review page is used to process pending submissions.
+
+Documented behavior:
+- Admin page lists pending spot submissions.
+- Admins can approve, reject, or flag.
+
+Access issue that was fixed:
+- Route access had an auth loading race.
+- Root cause: page checked `user` before Supabase auth hydration completed.
+- During hydration, `user` is temporarily null, which triggered incorrect redirect.
+
+Fix applied:
+- Wait for auth `loading` to finish before route decisions.
+- Then check whether user exists.
+- Then check whether user email is in admin allowlist.
+
+Additional cleanup:
+- `ADMIN_EMAILS` array syntax issue (comma) was fixed.
+
+---
+
+### 5. Bugs / Issues Encountered
+
+#### Issue A: `column spots.status does not exist`
+
+- Cause: frontend/service logic expected moderation columns before migration had been applied.
+- Fix: apply moderation SQL migration to add missing columns.
+
+#### Issue B: Admin redirect loop / bad redirect
+
+- Cause: auth state checked too early.
+- Fix: gate redirect logic behind auth loading completion.
+
+#### Issue C: Build issue in `BottomLeftWidget`
+
+- Cause: misplaced return/brace structure inside component.
+- Fix: keep component return inside function scope and remove invalid duplicate structure.
+
+---
+
+### 6. Add Spot UX Decisions
+
+To keep MVP costs low and behavior predictable:
+
+- Avoid user-triggered paid Google API calls in Add Spot flow.
+- No public address/place search for MVP.
+- Use free/client-side location selection only:
+  - Pick on Map
+  - Use Current Location
+  - Manual `Area / Address / Landmark` text input
+
+Google Places remains useful, but only for admin/import scripts where calls are controlled and budgetable.
+
+Why this decision:
+- Prevents accidental API cost spikes from normal user behavior.
+- Keeps the submission flow fast and dependency-light.
+- Keeps MVP affordable while still collecting usable location context.
+
+---
+
+### 7. Visible Spots Panel Decision
+
+Area grouping/tabs were explored, then reverted for MVP.
+
+What happened:
+- Grouping logic was added using area labels.
+- Imported official spots often did not yet have `area_text`/`region` labels.
+- Result: many rows fell into `Other Nearby`, reducing the value of the grouped UI.
+
+MVP decision:
+- Revert to the normal simple visible spots list.
+- Keep panel behavior stable and predictable while data quality catches up.
+
+Future plan:
+- Bring area/category tabs back after area labeling is reliably populated in imported data.
+
+---
+
+### 8. Settings Cleanup Direction
+
+Settings simplification was planned/handled with MVP scope in mind.
+
+- Remove Map Preferences section for now.
+- Remove Appearance section for now.
+- Keep Account, Notifications, Privacy, and Help/About as core structure for settings UX direction.
+- Unimplemented items show `Coming soon` placeholders.
+- Edit Profile opened from Settings should return back to Settings.
+
+Why:
+- Reduces unfinished UI surface area.
+- Keeps navigation clear while preserving extension points.
+
+---
+
+### 9. Concepts Learned (Beginner-Friendly)
+
+#### Database migrations
+Migrations are controlled schema updates. If app code expects new columns, migration must run first.
+
+#### Moderation workflows
+A `status` pipeline (`pending -> approved/rejected/flagged`) is safer than immediate publish.
+
+#### Status-based backend pipelines
+Using status in read/write rules cleanly separates public data from review-only data.
+
+#### Auth hydration/loading state
+Auth providers often initialize asynchronously. Guarding on loading avoids false redirects.
+
+#### Admin route protection
+Access checks should run only after auth is resolved, then validate role/email.
+
+#### Avoiding premature complexity
+A simpler UI with reliable data beats advanced UI with weak data quality at MVP stage.
+
+#### Cost control
+Avoiding user-triggered paid APIs helps keep launch costs predictable.
+
+#### MVP scoping
+Ship the essential loop first (submit -> review -> approve -> visible), then iterate UI depth after launch.
+
+---
+
+### 10. Next Steps
+
+1. Finish and test Add Spot submission flow end-to-end.
+2. Test admin review actions (approve/reject/flag) end-to-end.
+3. Confirm approved user spots appear on the public map.
+4. Tighten RLS/security policies before deployment.
+5. Add/verify loading, error, and empty states across critical pages.
+6. Deploy MVP.
+7. After MVP is live, redesign UI more creatively with better data foundations.
+
+---

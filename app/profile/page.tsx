@@ -274,7 +274,7 @@ export default function ProfilePage() {
         {/* Action buttons */}
         <div className="grid gap-3">
           <Link
-            href="/profile/edit"
+            href="/profile/edit?from=profile"
             className="block w-full rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-black transition-transform active:scale-[0.99]"
           >
             Edit Profile

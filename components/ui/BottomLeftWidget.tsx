@@ -9,17 +9,30 @@
 //
 // Actions currently include:
 //   • "Locate Me"  — flies the map to the user's GPS position
-//   • "Add Spot"   — placeholder button for V2
+//   • "Add Spot"   — opens the spot submission modal
 //   • "Profile"    — navigates to the profile hub
 //   • "Settings"   — navigates to profile settings
 // ============================================================
 
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import AddSpotFlow from "@/components/ui/AddSpotFlow";
 
-export default function BottomLeftWidget() {
+interface BottomLeftWidgetProps {
+  mapCenter: { lat: number; lng: number };
+  onLocationPick?: (callback: (lat: number, lng: number) => void) => void;
+  onMapMove?: (lat: number, lng: number) => void;
+}
+
+export default function BottomLeftWidget({
+  mapCenter,
+  onLocationPick,
+  onMapMove,
+}: BottomLeftWidgetProps) {
   const router = useRouter();
+  const [showAddSpotModal, setShowAddSpotModal] = useState(false);
 
   const handleLocateMe = () => {
     // Call the function exposed by MapView on `window`
@@ -28,8 +41,7 @@ export default function BottomLeftWidget() {
   };
 
   const handleAddSpot = () => {
-    // Placeholder — will be implemented in a future version
-    alert("Add Spot coming soon!");
+    setShowAddSpotModal(true);
   };
 
   const controlButtonClass =
@@ -37,6 +49,15 @@ export default function BottomLeftWidget() {
 
   return (
     <>
+      {/* Add Spot Flow */}
+      <AddSpotFlow
+        isOpen={showAddSpotModal}
+        onClose={() => setShowAddSpotModal(false)}
+        mapCenter={mapCenter}
+        onLocationPick={onLocationPick}
+        onMapMove={onMapMove}
+      />
+
       {/* Desktop: left floating toolbar */}
       <div className="fixed left-4 top-1/2 z-50 hidden -translate-y-1/2 flex-col gap-3 rounded-3xl border border-white/10 bg-zinc-900/70 p-2 shadow-xl backdrop-blur md:flex">
         <button

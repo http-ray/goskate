@@ -259,6 +259,7 @@ interface SpotRow {
   osm_name: string | null;
   osm_id: string;
   needs_review: boolean;
+  area_text?: string;
 }
 
 // ============================================================
@@ -302,7 +303,55 @@ function isSkateparkPlace(place: GooglePlace): boolean {
   return types.includes("skate_park") || name.includes("skate");
 }
 
-function placeToRow(place: GooglePlace): SpotRow | null {
+function normalizeRegionAreaLabel(region: Region): string {
+  if (
+    region.key === "atlanta-core" ||
+    region.key === "atlanta-north-suburbs" ||
+    region.key === "atlanta-south"
+  ) {
+    return "Atlanta Metro";
+  }
+
+  if (region.key === "gwinnett") return "Gwinnett / Lawrenceville";
+  if (region.key === "athens") return "Athens";
+  if (region.key === "gainesville-jefferson") return "Gainesville / Jefferson";
+  if (region.key === "savannah") return "Savannah";
+  if (region.key === "augusta") return "Augusta";
+  if (region.key === "macon") return "Macon";
+
+  return region.name;
+}
+
+function inferAreaLabelFromKnownParkCity(city: string): string {
+  const normalized = city.toLowerCase();
+
+  if (
+    normalized.includes("atlanta") ||
+    normalized.includes("dunwoody") ||
+    normalized.includes("newnan")
+  ) {
+    return "Atlanta Metro";
+  }
+  if (
+    normalized.includes("gwinnett") ||
+    normalized.includes("lawrenceville") ||
+    normalized.includes("lilburn") ||
+    normalized.includes("dacula")
+  ) {
+    return "Gwinnett / Lawrenceville";
+  }
+  if (normalized.includes("athens")) return "Athens";
+  if (normalized.includes("gainesville") || normalized.includes("jefferson")) {
+    return "Gainesville / Jefferson";
+  }
+  if (normalized.includes("savannah")) return "Savannah";
+  if (normalized.includes("augusta")) return "Augusta";
+  if (normalized.includes("macon")) return "Macon";
+
+  return city;
+}
+
+function placeToRow(place: GooglePlace, areaLabel?: string): SpotRow | null {
   const placeId = place.id;
   const lat = place.location?.latitude;
   const lon = place.location?.longitude;
@@ -335,6 +384,7 @@ function placeToRow(place: GooglePlace): SpotRow | null {
     // in multiple regions we only store it once.
     osm_id: `google_place/${placeId}`,
     needs_review: needsReview,
+    area_text: areaLabel,
   };
 }
 
@@ -590,7 +640,7 @@ async function main() {
     // Collect all places from all regions before upserting, so we
     // can dedupe across regions in memory (a park near a bbox border
     // may appear in two adjacent region results).
-    const allRegionPlaces: GooglePlace[] = [];
+    const allRegionPlaces: Array<{ place: GooglePlace; areaLabel: string }> = [];
     const seenPlaceIds = new Set<string>();
 
     for (let i = 0; i < regionsToRun.length; i++) {
@@ -607,7 +657,10 @@ async function main() {
         for (const place of result.places) {
           if (place.id && !seenPlaceIds.has(place.id)) {
             seenPlaceIds.add(place.id);
-            allRegionPlaces.push(place);
+            allRegionPlaces.push({
+              place,
+              areaLabel: normalizeRegionAreaLabel(region),
+            });
             newInThisRegion++;
           }
         }
@@ -629,8 +682,8 @@ async function main() {
 
     // Filter and convert to spot rows
     const regionRows = allRegionPlaces
-      .filter(isSkateparkPlace)
-      .map(placeToRow)
+      .filter(({ place }) => isSkateparkPlace(place))
+      .map(({ place, areaLabel }) => placeToRow(place, areaLabel))
       .filter((r): r is SpotRow => r !== null);
 
     console.log(`  📝 After skatepark filter: ${regionRows.length} rows to upsert`);
@@ -677,7 +730,10 @@ async function main() {
       console.log(`  ✅ ${park.name}`);
       console.log(`     → Google returned: "${returnedName}"`);
 
-      const row = placeToRow(result.place);
+      const row = placeToRow(
+        result.place,
+        inferAreaLabelFromKnownParkCity(park.city)
+      );
       if (row) knownRows.push(row);
       knownFound.push(park.name);
     }

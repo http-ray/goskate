@@ -1,21 +1,38 @@
 // ============================================================
 // Settings Page — /profile/settings
 //
-// Placeholder settings grouped into logical sections.
-// Each row is tappable but just shows an alert for now.
-// Sections: Account, Notifications, Privacy, Map Preferences,
-//           Appearance, Help / About.
+// MVP settings grouped into simple sections.
+// Sections: Account, Privacy, Help / About.
+// Most options currently show lightweight placeholders.
 // ============================================================
 
 "use client";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
+import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { user } = useAuth();
+  const [infoMessage, setInfoMessage] = useState<string | null>(null);
+
+  const showComingSoon = (feature: string) => {
+    setInfoMessage(`${feature} — Coming soon`);
+  };
+
+  const showFeedbackPlaceholder = () => {
+    setInfoMessage("Feedback form coming soon");
+  };
+
+  const showAbout = () => {
+    setInfoMessage(
+      "GoSkate helps skaters discover spots, share new spots with the community, and keep local scenes updated."
+    );
+  };
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
@@ -34,46 +51,62 @@ export default function SettingsPage() {
 
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
+      {infoMessage && (
+        <div className="mb-4 rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
+          {infoMessage}
+        </div>
+      )}
+
       {/* ---- Account ---- */}
       <SettingsSection title="Account">
-        <SettingsRow icon="👤" label="Edit Profile" href="/profile/edit" />
-        <SettingsRow icon="🔑" label="Change Password" />
-        <SettingsRow icon="📧" label="Email Address" />
+        <SettingsRow
+          icon="👤"
+          label="Edit Profile"
+          href="/profile/edit?from=settings"
+        />
+        <SettingsRow
+          icon="🔑"
+          label="Change Password"
+          onClick={() => showComingSoon("Change Password")}
+        />
+        <SettingsRow
+          icon="📧"
+          label="Email Address"
+          value={user?.email || "Coming soon"}
+          onClick={() => {
+            if (!user?.email) showComingSoon("Email Address");
+          }}
+        />
         <SettingsRow icon="🚪" label="Log Out" danger onClick={handleLogout} />
-      </SettingsSection>
-
-      {/* ---- Notifications ---- */}
-      <SettingsSection title="Notifications">
-        <SettingsRow icon="🔔" label="Push Notifications" />
-        <SettingsRow icon="📬" label="Email Notifications" />
-        <SettingsRow icon="🛹" label="Friend Activity Alerts" />
       </SettingsSection>
 
       {/* ---- Privacy ---- */}
       <SettingsSection title="Privacy">
-        <SettingsRow icon="👁️" label="Profile Visibility" />
-        <SettingsRow icon="📍" label="Location Sharing" />
-        <SettingsRow icon="🚫" label="Blocked Users" />
-      </SettingsSection>
-
-      {/* ---- Map Preferences ---- */}
-      <SettingsSection title="Map Preferences">
-        <SettingsRow icon="🗺️" label="Default Map Style" />
-        <SettingsRow icon="📏" label="Distance Units" />
-        <SettingsRow icon="📌" label="Show Only Favorites" />
-      </SettingsSection>
-
-      {/* ---- Appearance ---- */}
-      <SettingsSection title="Appearance">
-        <SettingsRow icon="🌙" label="Dark Mode" />
-        <SettingsRow icon="🎨" label="Accent Color" />
+        <SettingsRow
+          icon="👁️"
+          label="Profile Visibility"
+          onClick={() => showComingSoon("Privacy settings")}
+        />
+        <SettingsRow
+          icon="📍"
+          label="Location Sharing"
+          onClick={() => showComingSoon("Privacy settings")}
+        />
+        <SettingsRow
+          icon="🚫"
+          label="Blocked Users"
+          onClick={() => showComingSoon("Blocked Users")}
+        />
       </SettingsSection>
 
       {/* ---- Help / About ---- */}
       <SettingsSection title="Help / About">
-        <SettingsRow icon="❓" label="FAQ & Support" />
-        <SettingsRow icon="📝" label="Send Feedback" />
-        <SettingsRow icon="ℹ️" label="About GoSkate" />
+        <SettingsRow
+          icon="📝"
+          label="Send Feedback"
+          onClick={showFeedbackPlaceholder}
+        />
+        <SettingsRow icon="ℹ️" label="About GoSkate" onClick={showAbout} />
       </SettingsSection>
 
       {/* App version */}
@@ -111,21 +144,28 @@ function SettingsRow({
   icon,
   label,
   href,
+  value,
   danger,
   onClick,
 }: {
   icon: string;
   label: string;
   href?: string;
+  value?: string;
   danger?: boolean;
   onClick?: () => void;
 }) {
-  // If we have a real href, use a link; otherwise a button with a placeholder alert
   const inner = (
     <>
       <span className="text-lg">{icon}</span>
       <span className={`text-sm ${danger ? "text-red-400" : ""}`}>{label}</span>
-      <span className="ml-auto text-zinc-600 text-sm">›</span>
+      {value ? (
+        <span className="ml-auto text-xs text-zinc-500 truncate max-w-[45%] text-right">
+          {value}
+        </span>
+      ) : (
+        <span className="ml-auto text-zinc-600 text-sm">›</span>
+      )}
     </>
   );
 
@@ -149,10 +189,7 @@ function SettingsRow({
   }
 
   return (
-    <button
-      onClick={() => alert(`${label} — coming soon!`)}
-      className={classes}
-    >
+    <button onClick={() => alert(`${label} — Coming soon`)} className={classes}>
       {inner}
     </button>
   );

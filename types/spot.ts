@@ -24,6 +24,10 @@ export type Spot = {
   clipsCount?: number;
   /** How many skaters are currently active here (optional, for future live feature) */
   activeSkaters?: number;
+  /** Optional free-text area label used for grouped list sections (e.g., Atlanta Metro) */
+  areaText?: string;
+  /** Optional normalized region label for imports (e.g., Gwinnett / Lawrenceville) */
+  regionLabel?: string;
 };
 
 // ============================================================
@@ -46,4 +50,28 @@ export type SupabaseSpotRow = {
   enrichment_confidence: "high" | "medium" | "low" | null;
   needs_review: boolean;
   created_at: string;
+  // ---- User submission & moderation fields ----
+  created_by: string | null;
+  status: "pending" | "approved" | "rejected" | "flagged";
+  description: string | null;
+  obstacle_tags: string[]; // JSON array from database
+  area_text: string | null;
+  moderation_notes: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  possible_duplicate: boolean;
+};
+
+// ============================================================
+// SpotSubmission — fields required when submitting a new spot
+// ============================================================
+
+export type SpotSubmission = {
+  display_name: string;
+  type: "street" | "skatepark";
+  latitude: number;
+  longitude: number;
+  description?: string;
+  obstacle_tags?: string[];
+  area_text?: string;
 };

@@ -110,6 +110,12 @@ interface SpotRow {
   osm_name: string | null;
   osm_id: string;
   needs_review: boolean;
+  area_text?: string;
+}
+
+interface ImportedPlace {
+  place: GooglePlace;
+  areaLabel?: string;
 }
 
 interface BBox {
@@ -322,10 +328,11 @@ async function fetchPlacesForTarget(target: ImportTarget): Promise<FetchResult> 
   return { ok: true, places };
 }
 
-function convertPlacesToRows(allPlaces: GooglePlace[]): SpotRow[] {
+function convertPlacesToRows(allPlaces: ImportedPlace[]): SpotRow[] {
   const rowsById = new Map<string, SpotRow>();
 
-  for (const place of allPlaces) {
+  for (const item of allPlaces) {
+    const place = item.place;
     if (!isSkateparkPlace(place)) {
       continue;
     }
@@ -362,6 +369,7 @@ function convertPlacesToRows(allPlaces: GooglePlace[]): SpotRow[] {
       osm_name: name,
       osm_id: `google_place/${placeId}`,
       needs_review: needsReview,
+      area_text: item.areaLabel,
     });
   }
 
@@ -414,7 +422,7 @@ async function main() {
 
   const successfulTargets: string[] = [];
   const failedTargets: Array<{ name: string; reason: string }> = [];
-  const allPlaces: GooglePlace[] = [];
+  const allPlaces: ImportedPlace[] = [];
 
   for (let i = 0; i < targets.length; i++) {
     const target = targets[i];
@@ -423,7 +431,14 @@ async function main() {
     const result = await fetchPlacesForTarget(target);
     if (result.ok) {
       successfulTargets.push(target.label);
-      allPlaces.push(...result.places);
+      allPlaces.push(
+        ...result.places.map((place) => ({
+          place,
+          // Save the current import target label so the visible-spots panel
+          // can group official spots by area without external geocoding.
+          areaLabel: target.label,
+        }))
+      );
     } else {
       failedTargets.push({
         name: target.label,

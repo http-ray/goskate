@@ -28,13 +28,14 @@ import { DEMO_SPOTS } from "@/data/demoSpots";
 import SpotMarker from "./SpotMarker";
 import AddClipModal from "@/components/ui/AddClipModal";
 import VisibleSpotsPanel from "@/components/ui/VisibleSpotsPanel";
-import { fetchOfficialSpots } from "@/lib/spotsService";
+import BottomLeftWidget from "@/components/ui/BottomLeftWidget";
+import { fetchPublicSpots } from "@/lib/spotsService";
 
 // ---- Cluster bubble icon (GoSkate brand colours) ----
 // react-leaflet-cluster calls this function to build the icon for each
 // cluster bubble.  We replace the default blue circles with a dark-green
 // bubble that matches the official spot marker colour (#22c55e).
-function createClusterIcon(cluster: L.MarkerCluster): L.DivIcon {
+function createClusterIcon(cluster: any): L.DivIcon {
   const count = cluster.getChildCount();
   // Grow the bubble slightly as the cluster gets bigger.
   const size = count < 10 ? 36 : count < 50 ? 44 : 52;
@@ -110,20 +111,20 @@ export default function MapView() {
   const minZoom = isMobile ? MOBILE_MIN_ZOOM : DESKTOP_MIN_ZOOM;
 
   // ---- Supabase data state ----
-  // Official spots loaded from Supabase
-  const [officialSpots, setOfficialSpots] = useState<Spot[]>([]);
+  // Public spots loaded from Supabase (official + approved user spots)
+  const [publicSpots, setPublicSpots] = useState<Spot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
-  // ---- Fetch official spots from Supabase on mount ----
+  // ---- Fetch public spots from Supabase on mount ----
   useEffect(() => {
-    fetchOfficialSpots()
+    fetchPublicSpots()
       .then((spots) => {
-        setOfficialSpots(spots);
+        setPublicSpots(spots);
         setIsLoading(false);
       })
       .catch((error) => {
-        console.error("Failed to load official spots:", error);
+        console.error("Failed to load public spots:", error);
         setLoadError("Failed to load skateparks.");
         setIsLoading(false);
       });
@@ -154,8 +155,8 @@ export default function MapView() {
 
   // Stable merged array — only recomputed when Supabase data arrives.
   const allSpots = useMemo(
-    () => [...officialSpots, ...userSpots],
-    [officialSpots, userSpots],
+    () => [...publicSpots, ...userSpots],
+    [publicSpots, userSpots],
   );
 
   // ---- Check-in state ----
@@ -269,6 +270,64 @@ export default function MapView() {
     });
   }, []);
 
+  // ---- Move map to a specific location (for Add Spot flow) ----
+  const handleMapMove = useCallback((lat: number, lng: number) => {
+    mapRef.current?.flyTo([lat, lng], 15, {
+      duration: 1.2,
+    });
+  }, []);
+
+  // ---- Map click handler for spot location picking ----
+  const [locationPickCallback, setLocationPickCallback] = useState<
+    ((lat: number, lng: number) => void) | null
+  >(null);
+
+  const handleLocationPick = useCallback(
+    (callback: (lat: number, lng: number) => void) => {
+      setLocationPickCallback(() => callback);
+    },
+    []
+  );
+
+  // Attach map click listener when location picking is active
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !locationPickCallback) return;
+
+    const handleMapClick = (e: L.LeafletMouseEvent) => {
+      locationPickCallback(e.latlng.lat, e.latlng.lng);
+      setLocationPickCallback(null); // clear after one click
+    };
+
+    map.on("click", handleMapClick);
+
+    return () => {
+      map.off("click", handleMapClick);
+    };
+  }, [locationPickCallback]);
+
+  // Track current map center for AddSpotModal default location
+  const [currentMapCenter, setCurrentMapCenter] = useState({
+    lat: mapCenter[0],
+    lng: mapCenter[1],
+  });
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const updateCenter = () => {
+      const center = map.getCenter();
+      setCurrentMapCenter({ lat: center.lat, lng: center.lng });
+    };
+
+    map.on("moveend", updateCenter);
+
+    return () => {
+      map.off("moveend", updateCenter);
+    };
+  }, []);
+
   return (
     <>
       <MapContainer
@@ -344,6 +403,13 @@ export default function MapView() {
            Mobile: collapsed pill above the bottom dock, expands to sheet.
            Desktop: right-side floating panel, always visible. */}
       <VisibleSpotsPanel spots={visibleSpots} onSpotClick={handleFlyToSpot} />
+
+      {/* --- Bottom controls (Add Spot, Profile, Settings, Locate Me) --- */}
+      <BottomLeftWidget
+        mapCenter={currentMapCenter}
+        onLocationPick={handleLocationPick}
+        onMapMove={handleMapMove}
+      />
     </>
   );
 }

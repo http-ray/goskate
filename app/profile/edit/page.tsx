@@ -18,7 +18,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -31,7 +31,12 @@ import {
 
 export default function EditProfilePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
+  const from = searchParams.get("from");
+
+  const backHref = from === "settings" ? "/profile/settings" : "/profile";
+  const backLabel = from === "settings" ? "Back to settings" : "Back to profile";
 
   // ---- Profile loading state ----
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -138,10 +143,10 @@ export default function EditProfilePage() {
     <div className="min-h-screen bg-black px-5 py-8 text-white">
       <div className="mx-auto max-w-lg">
         <Link
-          href="/profile"
+          href={backHref}
           className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors hover:text-white"
         >
-          ← Back to profile
+          ← {backLabel}
         </Link>
 
         <h1 className="mb-6 text-2xl font-bold">Edit Profile</h1>

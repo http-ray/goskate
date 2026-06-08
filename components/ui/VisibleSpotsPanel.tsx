@@ -129,6 +129,13 @@ export default function VisibleSpotsPanel({
     </p>
   );
 
+  function renderSpotsList(closeOnClick: boolean) {
+    if (count === 0) return emptyMessage;
+    return spots.map((s) => renderSpotRow(s, closeOnClick));
+  }
+
+  const headerCountText = `${count} spot${count !== 1 ? "s" : ""} visible`;
+
   return (
     <>
       {/* ==============================================================
@@ -192,6 +199,7 @@ export default function VisibleSpotsPanel({
               <p className="text-sm font-semibold text-white">
                 {count} spot{count !== 1 ? "s" : ""} in view
               </p>
+              <p className="mt-0.5 text-xs text-zinc-400">{headerCountText}</p>
             </div>
 
             <button
@@ -219,7 +227,7 @@ export default function VisibleSpotsPanel({
 
           {/* Scrollable spot list */}
           <div className="flex-1 overflow-y-auto">
-            {count === 0 ? emptyMessage : spots.map((s) => renderSpotRow(s, true))}
+            {renderSpotsList(true)}
           </div>
         </div>
       )}
@@ -238,14 +246,12 @@ export default function VisibleSpotsPanel({
         {/* Panel header */}
         <div className="flex-shrink-0 border-b border-white/10 px-4 py-3">
           <p className="text-sm font-semibold text-white">Spots in view</p>
-          <p className="mt-0.5 text-xs text-zinc-400">
-            {count} spot{count !== 1 ? "s" : ""} visible
-          </p>
+          <p className="mt-0.5 text-xs text-zinc-400">{headerCountText}</p>
         </div>
 
         {/* Scrollable spot list */}
         <div className="flex-1 overflow-y-auto">
-          {count === 0 ? emptyMessage : spots.map((s) => renderSpotRow(s, false))}
+          {renderSpotsList(false)}
         </div>
       </div>
     </>

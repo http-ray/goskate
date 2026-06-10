@@ -32,69 +32,43 @@ import type { Spot, SupabaseSpotRow, SpotSubmission } from "@/types/spot";
 export async function fetchPublicSpots(): Promise<Spot[]> {
   const baseSelect = "id, display_name, latitude, longitude, type, source";
 
-  // Try to include area_text + region_label for grouped visible-spot sections.
-  // If either column is unavailable in an older DB schema, we retry safely.
+  // Try to include area_text for grouped visible-spot sections.
+  // If the column is unavailable in an older DB schema, we retry safely.
   let data: Array<
     Pick<
       SupabaseSpotRow,
       "id" | "display_name" | "latitude" | "longitude" | "type" | "source"
-    > & { area_text?: string | null; region_label?: string | null }
+    > & { area_text?: string | null }
   > | null = null;
 
   let error: { message: string } | null = null;
 
   const withArea = await supabase
     .from("spots")
-    .select(`${baseSelect}, area_text, region_label`)
+    .select(`${baseSelect}, area_text`)
     .eq("status", "approved");
 
   if (withArea.error) {
     const message = withArea.error.message.toLowerCase();
-    const missingGroupingColumn =
-      (message.includes("area_text") || message.includes("region_label")) &&
+    const missingAreaColumn =
+      message.includes("area_text") &&
       (message.includes("column") || message.includes("does not exist"));
 
-    if (missingGroupingColumn) {
-      // First fallback: try area_text only.
-      const withAreaOnly = await supabase
+    if (missingAreaColumn) {
+      // Fallback: base fields only.
+      const baseFallback = await supabase
         .from("spots")
-        .select(`${baseSelect}, area_text`)
+        .select(baseSelect)
         .eq("status", "approved");
 
-      if (withAreaOnly.error) {
-        const areaOnlyMessage = withAreaOnly.error.message.toLowerCase();
-        const missingAreaToo =
-          areaOnlyMessage.includes("area_text") &&
-          (areaOnlyMessage.includes("column") ||
-            areaOnlyMessage.includes("does not exist"));
+      data = baseFallback.data as Array<
+        Pick<
+          SupabaseSpotRow,
+          "id" | "display_name" | "latitude" | "longitude" | "type" | "source"
+        > & { area_text?: string | null }
+      >;
 
-        if (missingAreaToo) {
-          // Final fallback: base fields only.
-          const baseFallback = await supabase
-            .from("spots")
-            .select(baseSelect)
-            .eq("status", "approved");
-
-          data = baseFallback.data as Array<
-            Pick<
-              SupabaseSpotRow,
-              "id" | "display_name" | "latitude" | "longitude" | "type" | "source"
-            > & { area_text?: string | null; region_label?: string | null }
-          >;
-
-          error = baseFallback.error ? { message: baseFallback.error.message } : null;
-        } else {
-          error = { message: withAreaOnly.error.message };
-        }
-      } else {
-        data = withAreaOnly.data as Array<
-          Pick<
-            SupabaseSpotRow,
-            "id" | "display_name" | "latitude" | "longitude" | "type" | "source"
-          > & { area_text?: string | null; region_label?: string | null }
-        >;
-        error = null;
-      }
+      error = baseFallback.error ? { message: baseFallback.error.message } : null;
     } else {
       error = { message: withArea.error.message };
     }
@@ -103,7 +77,7 @@ export async function fetchPublicSpots(): Promise<Spot[]> {
       Pick<
         SupabaseSpotRow,
         "id" | "display_name" | "latitude" | "longitude" | "type" | "source"
-      > & { area_text?: string | null; region_label?: string | null }
+      > & { area_text?: string | null }
     >;
   }
 
@@ -116,7 +90,6 @@ export async function fetchPublicSpots(): Promise<Spot[]> {
   return (data || []).map(
     (row: Pick<SupabaseSpotRow, "id" | "display_name" | "latitude" | "longitude" | "type" | "source"> & {
       area_text?: string | null;
-      region_label?: string | null;
     }): Spot => ({
       id: row.id,
       name: row.display_name,   // display_name → name for the frontend
@@ -125,7 +98,6 @@ export async function fetchPublicSpots(): Promise<Spot[]> {
       type: row.type,
       source: row.source,
       areaText: row.area_text || undefined,
-      regionLabel: row.region_label || undefined,
       // clipsCount and activeSkaters will come from future tables
     })
   );

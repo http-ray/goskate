@@ -24,10 +24,8 @@ export type Spot = {
   clipsCount?: number;
   /** How many skaters are currently active here (optional, for future live feature) */
   activeSkaters?: number;
-  /** Optional free-text area label used for grouped list sections (e.g., Atlanta Metro) */
+  /** Optional area/city label used for grouped list sections (e.g., "Atlanta, GA") - set by backfill script or imports */
   areaText?: string;
-  /** Optional normalized region label for imports (e.g., Gwinnett / Lawrenceville) */
-  regionLabel?: string;
 };
 
 // ============================================================

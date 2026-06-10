@@ -488,3 +488,158 @@ Ship the essential loop first (submit -> review -> approve -> visible), then ite
 7. After MVP is live, redesign UI more creatively with better data foundations.
 
 ---
+
+## Session: Spots in View Search/Filters and Coordinate Area Backfill Fix
+
+**Date:** June 10, 2026  
+**Areas touched:** visible spots panel search/filter UX, coordinate backfill script, spots service field compatibility, MVP schema alignment
+
+---
+
+### 1. Session Overview
+
+This session continued polishing GoSkate for MVP deployment, with a practical focus on UX clarity and schema-safe data enrichment.
+
+- Added search/filter lookup to the Spots in View panel.
+- Added/fixed coordinate-based city/area labeling for existing spots.
+- Kept MVP schema simple by using the existing `area_text` column instead of adding `city` or `region_label`.
+
+Why this mattered:
+- The map experience becomes easier to scan when users can filter what they already see.
+- Existing spot data can be organized geographically without launching a risky schema expansion during MVP.
+- Shipping with fewer moving parts reduces deployment risk.
+
+---
+
+### 2. Spots in View Search / Filters
+
+The Spots in View panel now supports fast in-panel filtering of the spots that are already inside the current map viewport.
+
+What was added:
+- Search input in the panel.
+- Search only applies to spots currently visible in map bounds.
+- Search matches:
+  - spot name/display_name
+  - area_text
+  - type/category
+  - source
+- Filter chips/buttons:
+  - All
+  - Official
+  - User
+  - Skateparks
+  - Street
+- Search text and selected filter chip combine together.
+
+Example behavior:
+- If user selects **Official** and searches **Atlanta**, results show only visible official spots whose searchable text matches Atlanta.
+
+Empty states now communicate intent clearly:
+- If viewport has no spots: show no-spots-in-view message.
+- If viewport has spots but filters remove all: show no-search-matches message.
+
+Why this approach was chosen:
+- It avoids extra API calls by filtering the local visible list.
+- It preserves existing map behavior and keeps panel logic simple for MVP.
+
+---
+
+### 3. Coordinate-based Area Backfill
+
+A coordinate-based backfill script was created/fixed to assign area labels using spot latitude/longitude and a local free city dataset.
+
+How it works:
+- Reads spots with coordinates from Supabase.
+- Finds nearest city/area using coordinate distance math (Haversine).
+- Produces labels like:
+  - Atlanta, GA
+  - Buford, GA
+  - Los Angeles, CA
+- Writes matched label into the existing `area_text` column.
+
+Important constraints respected:
+- No paid APIs.
+- No Google Places calls for this backfill.
+- Admin-only script flow.
+- DRY_RUN safety mode retained.
+
+Why this is MVP-safe:
+- Keeps enrichment offline/local and cost-safe.
+- Uses existing schema column already consumed by app UI.
+- Avoids introducing schema migration risk during deployment window.
+
+---
+
+### 4. Bug Encountered
+
+Error observed:
+
+> Could not find the 'city' column of 'spots' in the schema cache
+
+What caused it:
+- The script attempted to select/update a `city` column that does not exist in `spots`.
+- The table also did not have `region_label`.
+
+Why this surfaced immediately:
+- Supabase validates payload columns against known table schema.
+- Any unknown column in `select` or `update` triggers schema cache errors.
+
+---
+
+### 5. Fix Applied
+
+The fix was to align all code with real MVP schema and use `area_text` only.
+
+Changes made:
+- Removed `city` from Supabase select queries.
+- Removed `city` from update payloads.
+- Removed `city` from skip/overwrite checks.
+- Removed `region_label` references.
+- Updated script writes to only:
+  - `area_text: matchedCityArea`
+- Updated panel search/grouping logic to use `area_text` as the city/area label.
+
+Result:
+- Backfill updates now succeed against existing schema.
+- Panel grouping/search works with populated `area_text` data.
+
+---
+
+### 6. Concepts Learned (Beginner-Friendly)
+
+#### Local dataset field vs database column
+- A local dataset can have fields like `city.name` or `city.lat`.
+- That does not mean your database has columns with those names.
+- You must map dataset output into actual DB columns that exist.
+
+#### Why Supabase schema errors happen
+- Supabase checks query/update fields against table schema.
+- If payload includes a non-existing column, request fails before update is applied.
+- This is a safety feature that prevents silent bad writes.
+
+#### Why using existing columns can be safer for MVP
+- Adding columns means migrations, compatibility checks, and potential rollback complexity.
+- Reusing an existing column (`area_text`) reduces moving parts and launch risk.
+- MVP favors stability and iteration speed over idealized schema design.
+
+#### How panel search can avoid extra API calls
+- Map already has a visible subset of spots in memory.
+- Search/filter can run on that in-memory subset.
+- This is fast, cheap, and simpler than new backend search endpoints for MVP.
+
+#### Why MVP should avoid unnecessary schema complexity
+- Every schema change increases coordination cost (DB + backend + frontend).
+- If a current column solves the immediate product need, use it.
+- Optimize architecture after core flow is stable in production.
+
+---
+
+### 7. Next Steps
+
+1. Do a small UI polish pass.
+2. Run RLS/security policy pass.
+3. Add loading/error/empty states across core pages.
+4. Test full MVP flow on desktop and mobile.
+5. Deploy to Vercel.
+
+---

@@ -34,6 +34,7 @@ export type Profile = {
   local_park: string | null;
   parks_visited_count: number;
   is_public: boolean;
+  is_admin: boolean;
   created_at: string;
   updated_at: string;
 };

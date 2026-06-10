@@ -77,9 +77,16 @@ CREATE POLICY "Users can create their own profile"
   WITH CHECK (auth.uid() = id);
 
 -- A signed-in user can update only their own row.
+-- WITH CHECK prevents self-elevation: is_admin must remain unchanged
+-- because regular users cannot grant themselves admin rights through
+-- the app. is_admin can only be set via the SQL console or a migration.
 CREATE POLICY "Users can update their own profile"
   ON profiles FOR UPDATE
-  USING (auth.uid() = id);
+  USING (auth.uid() = id)
+  WITH CHECK (
+    auth.uid() = id
+    AND is_admin = (SELECT is_admin FROM profiles WHERE id = auth.uid())
+  );
 
 -- A signed-in user can delete their own profile row.
 CREATE POLICY "Users can delete their own profile"
@@ -117,6 +124,22 @@ CREATE TRIGGER profiles_updated_at
   BEFORE UPDATE ON profiles
   FOR EACH ROW
   EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================
+-- Admin identity
+--
+-- is_admin is set manually by a developer via the Supabase SQL
+-- editor. It cannot be changed by users through the app because
+-- the UPDATE policy above locks it with a WITH CHECK subquery.
+--
+-- To grant admin rights to a user, run in the SQL editor:
+--   UPDATE profiles SET is_admin = true WHERE id = '<user-uuid>';
+--
+-- To find a user's UUID:
+--   SELECT id, email FROM auth.users WHERE email = 'you@example.com';
+-- ============================================================
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS is_admin BOOLEAN DEFAULT false;
 
 -- ============================================================
 -- Supabase Storage — avatar and banner images

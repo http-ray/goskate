@@ -124,52 +124,64 @@ CREATE POLICY "Users can delete their own pending submissions"
   );
 
 -- ============================================================
--- Admin Review Policies (placeholder)
+-- Admin Review Policies
 --
--- For MVP, we'll use a simple approach:
---   - Check if user's email is in a hardcoded admin list
---   - OR check if profiles.is_admin = true (if you add that column)
+-- Admins are identified by profiles.is_admin = true.
+-- That column is added in profiles-schema.sql and must be set
+-- manually via the Supabase SQL editor — it cannot be set by
+-- users through the app (the profiles UPDATE policy locks it).
 --
--- For now, these policies are commented out. Implement admin
--- review in the app code with service role key or a custom
--- SQL function that checks admin status.
---
--- Example (requires adding is_admin to profiles table):
--- CREATE POLICY "Admins can read all spots"
---   ON spots FOR SELECT
---   USING (
---     EXISTS (
---       SELECT 1 FROM profiles
---       WHERE profiles.id = auth.uid()
---       AND profiles.is_admin = true
---     )
---   );
---
--- CREATE POLICY "Admins can update any spot"
---   ON spots FOR UPDATE
---   USING (
---     EXISTS (
---       SELECT 1 FROM profiles
---       WHERE profiles.id = auth.uid()
---       AND profiles.is_admin = true
---     )
---   );
+-- These two policies cover all three moderation actions
+-- (approve, reject, flag) because all three are UPDATE
+-- operations on the status + reviewed_by + reviewed_at fields.
 -- ============================================================
+
+-- Allow admins to read spots of any status (pending, rejected, flagged).
+-- Regular users only see approved spots (policy above); this gives
+-- admins full visibility for the moderation queue.
+CREATE POLICY "Admins can read all spots"
+  ON spots FOR SELECT
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+        AND profiles.is_admin = true
+    )
+  );
+
+-- Allow admins to update any spot — specifically to change status,
+-- set reviewed_by, reviewed_at, and moderation_notes.
+-- USING filters which rows are visible for update; WITH CHECK
+-- ensures the resulting row still passes a sanity check.
+CREATE POLICY "Admins can update any spot"
+  ON spots FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+        AND profiles.is_admin = true
+    )
+  )
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+        AND profiles.is_admin = true
+    )
+  );
 
 -- ============================================================
 -- Migration notes
 --
 -- This schema assumes the base spots table already exists.
--- If you're applying this to a fresh database, run schema.sql first.
+-- Run schema.sql first if applying to a fresh database.
 --
 -- After running this SQL:
---   1. Update spotsService to filter by status = 'approved'
---   2. Build the Add Spot UI (modal/page)
---   3. Build the Admin Review UI (/admin/review)
---   4. Add duplicate detection logic in submission flow
---
--- Security TODO:
---   - Add is_admin column to profiles table if using role-based admin
---   - Or maintain a hardcoded admin email list in app code
---   - Consider using Supabase Functions for admin actions with service role
+--   1. Run profiles-schema.sql to create the profiles table
+--      and the is_admin column that these policies reference.
+--   2. Grant is_admin = true to admin users:
+--        UPDATE profiles SET is_admin = true WHERE id = '<your-uuid>';
+--   3. Verify policies with:
+--        SELECT policyname, cmd, qual FROM pg_policies
+--        WHERE tablename = 'spots' ORDER BY cmd;
 -- ============================================================

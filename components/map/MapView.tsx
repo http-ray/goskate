@@ -16,7 +16,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -24,7 +24,6 @@ import MarkerClusterGroup from "react-leaflet-cluster";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 
 import { Spot } from "@/types/spot";
-import { DEMO_SPOTS } from "@/data/demoSpots";
 import SpotMarker from "./SpotMarker";
 import AddClipModal from "@/components/ui/AddClipModal";
 import VisibleSpotsPanel from "@/components/ui/VisibleSpotsPanel";
@@ -130,34 +129,6 @@ export default function MapView() {
       });
   }, []);
 
-  // ---- Combine official OSM spots with local user spots ----
-  //
-  // ROOT CAUSE OF THE INFINITE LOOP (now fixed):
-  //   Without useMemo, these two lines run on EVERY render and create new
-  //   array references each time — even when the data hasn't changed.
-  //   The visible spots useEffect had [allSpots] in its deps, so a new
-  //   reference triggered the effect → setVisibleSpots → re-render →
-  //   new allSpots reference → effect again → infinite loop.
-  //
-  // The fix: useMemo makes `allSpots` return the SAME array reference
-  //   unless `officialSpots` actually changes.  Since officialSpots only
-  //   changes once (when Supabase loads), the visible spots effect runs
-  //   exactly twice: on mount (empty) and once when data arrives.
-  //   After that, panning/zooming calls setVisibleSpots but doesn't
-  //   change `allSpots`, so the effect never re-runs in a loop.
-
-  // Filter DEMO_SPOTS to only include user-added spots.
-  // DEMO_SPOTS is a module-level constant so this never needs to recompute.
-  const userSpots = useMemo(
-    () => DEMO_SPOTS.filter((spot) => spot.source === "user"),
-    [], // empty deps — DEMO_SPOTS never changes
-  );
-
-  // Stable merged array — only recomputed when Supabase data arrives.
-  const allSpots = useMemo(
-    () => [...publicSpots, ...userSpots],
-    [publicSpots, userSpots],
-  );
 
   // ---- Check-in state ----
   // A Set of spot IDs the user has checked into (frontend-only).
@@ -222,10 +193,10 @@ export default function MapView() {
 
   // ---- Visible spots — recalculate when the viewport or data changes ----
   //
-  // This effect is safe from infinite loops because `allSpots` is wrapped in
+  // This effect is safe from infinite loops because `publicSpots` is wrapped in
   // useMemo above and only gets a new reference when `officialSpots` changes
   // (i.e., once after Supabase loads).  Calling setVisibleSpots on moveend
-  // triggers a re-render, but `allSpots` keeps its stable reference → the
+  // triggers a re-render, but `publicSpots` keeps its stable reference → the
   // effect does NOT re-run → no loop.
   //
   // `isMobile` is also in deps because the MapContainer remounts (via its
@@ -235,13 +206,13 @@ export default function MapView() {
     const map = mapRef.current;
     if (!map) return;
 
-    // Filter allSpots to those whose coordinates fall inside the current
+    // Filter publicSpots to those whose coordinates fall inside the current
     // Leaflet viewport rectangle.  O(n) per call — fast enough for thousands
     // of spots since getBounds().contains() is a simple range check.
     function updateVisible() {
       const bounds = map!.getBounds();
       setVisibleSpots(
-        allSpots.filter((spot) =>
+        publicSpots.filter((spot) =>
           bounds.contains([spot.latitude, spot.longitude])
         )
       );
@@ -261,7 +232,7 @@ export default function MapView() {
       map.off("moveend", updateVisible);
       map.off("zoomend", updateVisible);
     };
-  }, [allSpots, isMobile]);
+  }, [publicSpots, isMobile]);
 
   // ---- Fly to a spot when the user taps it in the panel ----
   const handleFlyToSpot = useCallback((spot: Spot) => {
@@ -367,7 +338,7 @@ export default function MapView() {
           zoomToBoundsOnClick
           maxClusterRadius={60}
         >
-          {allSpots.map((spot) => (
+          {publicSpots.map((spot) => (
             <SpotMarker
               key={spot.id}
               spot={spot}

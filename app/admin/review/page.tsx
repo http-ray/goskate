@@ -3,15 +3,12 @@
 // ============================================================
 // Admin Review Page — moderation interface for pending spots
 //
-// This page allows admins to review user-submitted spots and
-// take moderation actions (approve, reject, flag).
-//
-// Access Control (MVP):
-//   - Hardcoded admin email list (TODO: migrate to profiles.is_admin)
+// Access control: checks profiles.is_admin = true via Supabase.
+// The is_admin flag is enforced at the DB layer by RLS — only
+// rows with is_admin = true can SELECT or UPDATE pending spots.
 //
 // Features:
 //   - List pending spots with submitter details
-//   - Show nearby spots for duplicate detection
 //   - Approve, reject, or flag spots
 //   - Add moderation notes
 // ============================================================
@@ -21,14 +18,6 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import type { SupabaseSpotRow } from "@/types/spot";
-
-// ---- Admin access control (MVP hardcoded list) ----
-// TODO: Replace with profiles.is_admin column when scaling
-const ADMIN_EMAILS = [
-  "admin@goskate.app",
-  "raymxs7@gmail.com",
-  // Add more admin emails here
-];
 
 interface PendingSpotWithProfile extends SupabaseSpotRow {
   submitter_username?: string;
@@ -48,7 +37,7 @@ export default function AdminReviewPage() {
   const [currentAction, setCurrentAction] = useState<"approve" | "reject" | "flag" | null>(null);
   const [currentSpot, setCurrentSpot] = useState<PendingSpotWithProfile | null>(null);
 
-  // ---- Check admin access ----
+  // ---- Check admin access via profiles.is_admin ----
   useEffect(() => {
     if (authLoading) return;
 
@@ -58,16 +47,24 @@ export default function AdminReviewPage() {
       return;
     }
 
-    // Check if user email is in admin list
-    const isUserAdmin = ADMIN_EMAILS.includes(user.email || "");
-    setIsAdmin(isUserAdmin);
-    setAccessChecked(true);
+    (async () => {
+      try {
+        const { data } = await supabase
+          .from("profiles")
+          .select("is_admin")
+          .eq("id", user.id)
+          .single();
 
-    if (!isUserAdmin) {
-      alert("You don't have admin access.");
-      router.push("/");
-      return;
-    }
+        const admin = data?.is_admin === true;
+        setIsAdmin(admin);
+        setAccessChecked(true);
+        if (!admin) router.push("/");
+      } catch {
+        setIsAdmin(false);
+        setAccessChecked(true);
+        router.push("/");
+      }
+    })();
   }, [authLoading, user, router]);
 
   // ---- Fetch pending spots ----

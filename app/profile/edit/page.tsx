@@ -17,7 +17,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -30,6 +30,14 @@ import {
 } from "@/lib/profilesService";
 
 export default function EditProfilePage() {
+  return (
+    <Suspense>
+      <EditProfileContent />
+    </Suspense>
+  );
+}
+
+function EditProfileContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();

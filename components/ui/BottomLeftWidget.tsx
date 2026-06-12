@@ -45,7 +45,7 @@ export default function BottomLeftWidget({
   };
 
   const controlButtonClass =
-    "flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/80 text-white shadow-lg backdrop-blur transition-transform active:scale-95";
+    "flex h-12 w-12 items-center justify-center rounded-full border border-line bg-elevated text-ink shadow-lg transition-colors hover:bg-elevated active:scale-95";
 
   return (
     <>
@@ -59,7 +59,7 @@ export default function BottomLeftWidget({
       />
 
       {/* Desktop: left floating toolbar */}
-      <div className="fixed left-4 top-1/2 z-50 hidden -translate-y-1/2 flex-col gap-3 rounded-3xl border border-white/10 bg-zinc-900/70 p-2 shadow-xl backdrop-blur md:flex">
+      <div className="fixed left-4 top-1/2 z-50 hidden -translate-y-1/2 flex-col gap-3 rounded-3xl border border-line bg-surface p-2 shadow-xl md:flex">
         <button
           onClick={() => router.push("/profile")}
           aria-label="Profile"
@@ -85,7 +85,7 @@ export default function BottomLeftWidget({
         <button
           onClick={handleAddSpot}
           aria-label="Add spot"
-          className="flex h-14 w-14 items-center justify-center rounded-full bg-green-500/90 text-white shadow-lg backdrop-blur transition-transform active:scale-95"
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-accent text-on-accent shadow-lg shadow-accent/20 transition-colors hover:bg-accent-press active:scale-95"
         >
           {/* Plus icon */}
           <svg
@@ -138,7 +138,7 @@ export default function BottomLeftWidget({
       <button
         onClick={handleLocateMe}
         aria-label="Locate me"
-        className="fixed bottom-28 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full bg-zinc-900/85 text-white shadow-lg backdrop-blur transition-transform active:scale-95 md:hidden"
+        className="fixed bottom-28 right-4 z-50 flex h-12 w-12 items-center justify-center rounded-full border border-line bg-elevated text-ink shadow-lg transition-colors hover:bg-elevated active:scale-95 md:hidden"
       >
         {/* Crosshair icon */}
         <svg
@@ -164,7 +164,7 @@ export default function BottomLeftWidget({
       <button
         onClick={handleLocateMe}
         aria-label="Locate me"
-        className="fixed left-4 top-6 z-50 hidden h-12 w-12 items-center justify-center rounded-full bg-zinc-900/85 text-white shadow-lg backdrop-blur transition-transform active:scale-95 md:flex"
+        className="fixed left-4 top-6 z-50 hidden h-12 w-12 items-center justify-center rounded-full border border-line bg-elevated text-ink shadow-lg transition-colors hover:bg-elevated active:scale-95 md:flex"
       >
         {/* Crosshair icon */}
         <svg
@@ -188,11 +188,11 @@ export default function BottomLeftWidget({
 
       {/* Mobile: floating bottom dock with thumb-friendly controls */}
       <div className="fixed inset-x-4 bottom-4 z-50 md:hidden">
-        <div className="grid grid-cols-3 items-end rounded-3xl border border-white/10 bg-zinc-900/75 px-4 pb-3 pt-2 shadow-xl backdrop-blur">
+        <div className="grid grid-cols-3 items-end rounded-3xl border border-line bg-surface px-4 pb-3 pt-2 shadow-xl">
           <button
             onClick={() => router.push("/profile")}
             aria-label="Profile"
-            className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-800/90 text-white shadow-md transition-transform active:scale-95"
+            className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-elevated text-ink shadow-md transition-colors hover:bg-line/40 active:scale-95"
           >
             {/* User icon */}
             <svg
@@ -214,7 +214,7 @@ export default function BottomLeftWidget({
           <button
             onClick={handleAddSpot}
             aria-label="Add spot"
-            className="mx-auto -mt-6 flex h-16 w-16 items-center justify-center rounded-full bg-green-500 text-white shadow-xl ring-4 ring-zinc-900/60 transition-transform active:scale-95"
+            className="mx-auto -mt-6 flex h-16 w-16 items-center justify-center rounded-full bg-accent text-on-accent shadow-xl shadow-accent/25 ring-4 ring-base/60 transition-colors hover:bg-accent-press active:scale-95"
           >
             {/* Plus icon */}
             <svg
@@ -236,7 +236,7 @@ export default function BottomLeftWidget({
           <button
             onClick={() => router.push("/profile/settings")}
             aria-label="Filters and settings"
-            className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-zinc-800/90 text-white shadow-md transition-transform active:scale-95"
+            className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-elevated text-ink shadow-md transition-colors hover:bg-line/40 active:scale-95"
           >
             {/* Sliders icon */}
             <svg

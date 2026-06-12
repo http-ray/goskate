@@ -46,6 +46,18 @@ export default function VisibleSpotsPanel({
   const [searchText, setSearchText] = useState("");
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
+  // Collapsible area sections. Every city/area starts COLLAPSED — only the
+  // keys listed here are expanded. While searching we force-expand matching
+  // sections so results are always visible (see renderSpotsList).
+  const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
+  const toggleArea = (key: string) =>
+    setExpandedAreas((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
   const count = spots.length;
 
   // ---- Filter and search logic ----
@@ -123,19 +135,19 @@ export default function VisibleSpotsPanel({
           // On mobile, dismiss the sheet so the user can see the map.
           if (closeOnClick) setIsOpen(false);
         }}
-        className="w-full border-b border-white/5 px-4 py-3 text-left transition-colors last:border-0 hover:bg-white/5 active:bg-white/10"
+        className="w-full border-b border-line-soft px-4 py-3 text-left transition-colors last:border-0 hover:bg-white/5 active:bg-white/10"
       >
         <div className="flex items-start gap-3">
           {/* Colour dot — green for official, amber for user-added */}
           <div
             className={`mt-1.5 h-2.5 w-2.5 flex-shrink-0 rounded-full ${
-              isOfficial ? "bg-green-500" : "bg-amber-500"
+              isOfficial ? "bg-success" : "bg-warning"
             }`}
           />
 
           <div className="min-w-0 flex-1">
             {/* Spot name — truncated when too long */}
-            <p className="truncate text-sm font-medium text-white">
+            <p className="truncate text-sm font-medium text-ink">
               {spot.name}
             </p>
 
@@ -145,8 +157,8 @@ export default function VisibleSpotsPanel({
               <span
                 className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
                   isSkatepark
-                    ? "bg-blue-500/20 text-blue-300"
-                    : "bg-zinc-600/40 text-zinc-300"
+                    ? "bg-info/15 text-info"
+                    : "bg-elevated text-muted"
                 }`}
               >
                 {isSkatepark ? "Skatepark" : "Street"}
@@ -156,8 +168,8 @@ export default function VisibleSpotsPanel({
               <span
                 className={`rounded px-1.5 py-0.5 text-[11px] font-medium ${
                   isOfficial
-                    ? "bg-green-500/20 text-green-300"
-                    : "bg-amber-500/20 text-amber-300"
+                    ? "bg-success/15 text-success"
+                    : "bg-warning/15 text-warning"
                 }`}
               >
                 {isOfficial ? "Official" : "User"}
@@ -165,7 +177,7 @@ export default function VisibleSpotsPanel({
 
               {/* Clips count — only shown when the spot has clips */}
               {spot.clipsCount !== undefined && spot.clipsCount > 0 && (
-                <span className="text-[11px] text-zinc-400">
+                <span className="text-[11px] text-muted">
                   🎬 {spot.clipsCount}
                 </span>
               )}
@@ -174,7 +186,7 @@ export default function VisibleSpotsPanel({
 
           {/* Right-pointing chevron — signals the row is tappable */}
           <svg
-            className="mt-0.5 flex-shrink-0 text-zinc-600"
+            className="mt-0.5 flex-shrink-0 text-faint"
             width="16"
             height="16"
             viewBox="0 0 24 24"
@@ -195,13 +207,13 @@ export default function VisibleSpotsPanel({
   // ---- Shared empty-state message ----
   const emptyMessage =
     count === 0 ? (
-      <p className="px-4 py-8 text-center text-sm text-zinc-500">
+      <p className="px-4 py-8 text-center text-sm text-faint">
         No spots visible here.
         <br />
         Pan or zoom out to find more.
       </p>
     ) : (
-      <p className="px-4 py-8 text-center text-sm text-zinc-500">
+      <p className="px-4 py-8 text-center text-sm text-faint">
         No spots match your search.
         <br />
         Try different keywords or filters.
@@ -222,11 +234,7 @@ export default function VisibleSpotsPanel({
     return (
       <button
         onClick={() => setActiveFilter(filter)}
-        className={`whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
-          isActive
-            ? "bg-blue-500 text-white"
-            : "border border-white/10 bg-white/5 text-zinc-300 hover:bg-white/10"
-        }`}
+        className={isActive ? "gs-chip-active" : "gs-chip"}
       >
         {label}
         {chipCount !== undefined && chipCount > 0 && (
@@ -239,11 +247,11 @@ export default function VisibleSpotsPanel({
   // ---- Search and filter UI ----
   function renderSearchAndFilters() {
     return (
-      <div className="flex-shrink-0 space-y-3 border-b border-white/10 px-4 pb-3">
+      <div className="flex-shrink-0 space-y-3 border-b border-line px-4 pb-3">
         {/* Search input */}
         <div className="relative">
           <svg
-            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint"
             width="14"
             height="14"
             viewBox="0 0 24 24"
@@ -262,12 +270,12 @@ export default function VisibleSpotsPanel({
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
             placeholder="Search spots..."
-            className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-9 pr-3 text-sm text-white placeholder-zinc-500 outline-none transition-colors focus:border-blue-500/50 focus:bg-white/10"
+            className="w-full rounded-xl border border-line-soft bg-field py-2 pl-9 pr-9 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-accent/50 focus:bg-elevated"
           />
           {searchText && (
             <button
               onClick={() => setSearchText("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-zinc-500 transition-colors hover:bg-white/10 hover:text-white"
+              className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-faint transition-colors hover:bg-white/5 hover:text-ink"
               aria-label="Clear search"
             >
               <svg
@@ -303,20 +311,51 @@ export default function VisibleSpotsPanel({
   function renderSpotsList(closeOnClick: boolean) {
     if (filteredSpots.length === 0) return emptyMessage;
 
+    // While searching, force every matching section open so results show.
+    // Otherwise sections stay collapsed until the user taps them.
+    const isSearching = searchText.trim().length > 0;
+
     return groupedSpots.sortedKeys.map((groupKey) => {
       const groupSpots = groupedSpots.groups.get(groupKey)!;
+      const isExpanded = isSearching || expandedAreas.has(groupKey);
 
       return (
-        <div key={groupKey} className="border-b border-white/5 last:border-0">
-          {/* Area header */}
-          <div className="sticky top-0 bg-zinc-800/90 px-4 py-2 backdrop-blur">
-            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+        <div key={groupKey} className="border-b border-line-soft last:border-0">
+          {/* Collapsible area header — click to expand/collapse */}
+          <button
+            type="button"
+            onClick={() => toggleArea(groupKey)}
+            aria-expanded={isExpanded}
+            className="flex w-full items-center justify-between gap-2 bg-elevated px-4 py-2.5 text-left transition-colors hover:bg-line/30"
+          >
+            <span className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
               {groupKey}
-            </p>
-          </div>
+            </span>
+            <span className="flex flex-shrink-0 items-center gap-2">
+              <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium text-muted">
+                {groupSpots.length}
+              </span>
+              <svg
+                className="text-faint transition-transform"
+                style={{ transform: isExpanded ? "rotate(90deg)" : "none" }}
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
+            </span>
+          </button>
 
-          {/* Spots in this group */}
-          {groupSpots.map((spot) => renderSpotRow(spot, closeOnClick))}
+          {/* Spots in this group — hidden when the section is collapsed */}
+          {isExpanded &&
+            groupSpots.map((spot) => renderSpotRow(spot, closeOnClick))}
         </div>
       );
     });
@@ -345,9 +384,9 @@ export default function VisibleSpotsPanel({
           <button
             onClick={() => setIsOpen(true)}
             aria-label={`${count} spots in view — tap to expand`}
-            className="pointer-events-auto flex w-full items-center justify-between rounded-2xl border border-white/10 bg-zinc-900/90 px-4 py-3 shadow-xl backdrop-blur"
+            className="pointer-events-auto flex w-full items-center justify-between rounded-2xl border border-line bg-surface px-4 py-3 shadow-xl"
           >
-            <span className="text-sm font-medium text-white">
+            <span className="text-sm font-medium text-ink">
               🛹&nbsp;
               {filteredSpots.length !== count
                 ? `${filteredSpots.length} of ${count}`
@@ -356,7 +395,7 @@ export default function VisibleSpotsPanel({
             </span>
             {/* Chevron up — indicates panel opens upward */}
             <svg
-              className="text-zinc-400"
+              className="text-muted"
               width="18"
               height="18"
               viewBox="0 0 24 24"
@@ -385,14 +424,14 @@ export default function VisibleSpotsPanel({
 
       {/* Expanded bottom sheet */}
       {isOpen && (
-        <div className="fixed inset-x-0 bottom-0 z-[450] flex h-[75vh] flex-col rounded-t-2xl border-t border-white/10 bg-zinc-900 shadow-2xl md:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-[450] flex h-[75vh] flex-col rounded-t-2xl border-t border-line bg-surface shadow-2xl md:hidden">
           {/* Sheet header — drag handle + count + close button */}
-          <div className="flex flex-shrink-0 items-center justify-between border-b border-white/10 px-4 pb-3 pt-4">
+          <div className="flex flex-shrink-0 items-center justify-between border-b border-line px-4 pb-3 pt-4">
             <div>
               {/* Visual drag-handle bar */}
-              <div className="mb-2 h-1 w-10 rounded-full bg-zinc-700" />
-              <p className="text-sm font-semibold text-white">Spots in view</p>
-              <p className="mt-0.5 text-xs text-zinc-400">{headerCountText}</p>
+              <div className="mb-2 h-1 w-10 rounded-full bg-line" />
+              <p className="text-sm font-semibold text-ink">Spots in view</p>
+              <p className="mt-0.5 text-xs text-muted">{headerCountText}</p>
             </div>
 
             <button
@@ -401,7 +440,7 @@ export default function VisibleSpotsPanel({
               className="rounded-full p-2 transition-colors hover:bg-white/10"
             >
               <svg
-                className="text-zinc-400"
+                className="text-muted"
                 width="18"
                 height="18"
                 viewBox="0 0 24 24"
@@ -436,13 +475,13 @@ export default function VisibleSpotsPanel({
           max-h keeps it from overflowing the viewport on short screens.
           The left side is reserved for BottomLeftWidget. */}
       <div
-        className="fixed right-4 top-20 z-[450] hidden w-80 flex-col rounded-2xl border border-white/10 bg-zinc-900/85 shadow-2xl backdrop-blur md:flex"
+        className="fixed right-4 top-20 z-[450] hidden w-80 flex-col rounded-2xl border border-line bg-surface shadow-2xl md:flex"
         style={{ maxHeight: "calc(100vh - 160px)" }}
       >
         {/* Panel header */}
-        <div className="flex-shrink-0 border-b border-white/10 px-4 py-3">
-          <p className="text-sm font-semibold text-white">Spots in view</p>
-          <p className="mt-0.5 text-xs text-zinc-400">{headerCountText}</p>
+        <div className="flex-shrink-0 border-b border-line px-4 py-3">
+          <p className="text-sm font-semibold text-ink">Spots in view</p>
+          <p className="mt-0.5 text-xs text-muted">{headerCountText}</p>
         </div>
 
         {/* Search and filters */}

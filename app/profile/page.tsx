@@ -128,8 +128,8 @@ export default function ProfilePage() {
   // ---- Auth loading ----
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-black px-5 py-8 text-white">
-        <div className="mx-auto flex min-h-[70vh] max-w-lg items-center justify-center rounded-3xl border border-white/10 bg-zinc-950/80 p-6 text-sm text-zinc-400 backdrop-blur">
+      <div className="min-h-screen bg-base px-5 py-8 text-ink">
+        <div className="mx-auto flex min-h-[70vh] max-w-lg items-center justify-center rounded-2xl border border-line bg-surface p-6 text-sm text-muted">
           Loading your account...
         </div>
       </div>
@@ -139,31 +139,31 @@ export default function ProfilePage() {
   // ---- Signed out — show auth form ----
   if (!user) {
     return (
-      <div className="min-h-screen bg-black px-5 py-8 text-white">
+      <div className="min-h-screen bg-base px-5 py-8 text-ink">
         <div className="mx-auto max-w-lg">
           <Link
             href="/"
-            className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors hover:text-white"
+            className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-ink"
           >
             ← Back to map
           </Link>
 
-          <div className="rounded-3xl border border-white/10 bg-zinc-950/80 p-5 shadow-2xl backdrop-blur">
-            <p className="text-xs uppercase tracking-[0.2em] text-zinc-500">
+          <div className="rounded-2xl border border-line bg-surface p-5 shadow-2xl">
+            <p className="text-xs uppercase tracking-[0.2em] text-faint">
               GoSkate Account
             </p>
             <h1 className="mt-2 text-2xl font-bold">Sign in or create an account</h1>
-            <p className="mt-2 text-sm leading-6 text-zinc-400">
+            <p className="mt-2 text-sm leading-6 text-muted">
               Use Supabase Auth to stay logged in across refreshes. Username and
               avatar image support are stored in your auth metadata.
             </p>
 
-            <div className="mt-5 grid grid-cols-2 rounded-2xl bg-zinc-900 p-1 text-sm">
+            <div className="mt-5 grid grid-cols-2 rounded-xl bg-field p-1 text-sm">
               <button
                 type="button"
                 onClick={() => setMode("login")}
                 className={`rounded-xl px-3 py-2 transition-colors ${
-                  mode === "login" ? "bg-white text-black" : "text-zinc-400"
+                  mode === "login" ? "bg-accent text-on-accent" : "text-muted"
                 }`}
               >
                 Log in
@@ -172,7 +172,7 @@ export default function ProfilePage() {
                 type="button"
                 onClick={() => setMode("signup")}
                 className={`rounded-xl px-3 py-2 transition-colors ${
-                  mode === "signup" ? "bg-white text-black" : "text-zinc-400"
+                  mode === "signup" ? "bg-accent text-on-accent" : "text-muted"
                 }`}
               >
                 Sign up
@@ -214,13 +214,13 @@ export default function ProfilePage() {
               )}
 
               {error && (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                <div className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
                   {error}
                 </div>
               )}
 
               {message && (
-                <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                <div className="rounded-2xl border border-success/30 bg-success/10 px-4 py-3 text-sm text-success">
                   {message}
                 </div>
               )}
@@ -228,7 +228,7 @@ export default function ProfilePage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+                className="w-full gs-btn-primary disabled:opacity-60"
               >
                 {saving ? "Working..." : mode === "signup" ? "Create account" : "Log in"}
               </button>
@@ -241,24 +241,24 @@ export default function ProfilePage() {
 
   // ---- Signed in — show real profile from Supabase profiles table ----
   return (
-    <div className="min-h-screen bg-black px-5 py-8 text-white">
+    <div className="min-h-screen bg-base px-5 py-8 text-ink">
       <div className="mx-auto max-w-lg space-y-4">
         <Link
           href="/"
-          className="inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors hover:text-white"
+          className="inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-ink"
         >
           ← Back to map
         </Link>
 
         {/* Profile card loading / error states */}
         {profileLoading && (
-          <div className="rounded-3xl border border-white/10 bg-zinc-950/80 p-6 text-sm text-zinc-400 backdrop-blur">
+          <div className="rounded-2xl border border-line bg-surface p-6 text-sm text-muted">
             Loading profile...
           </div>
         )}
 
         {profileError && (
-          <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+          <div className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
             {profileError}
           </div>
         )}
@@ -275,20 +275,20 @@ export default function ProfilePage() {
         <div className="grid gap-3">
           <Link
             href="/profile/edit?from=profile"
-            className="block w-full rounded-2xl bg-white px-4 py-3 text-center text-sm font-semibold text-black transition-transform active:scale-[0.99]"
+            className="block w-full gs-btn-primary text-center"
           >
             Edit Profile
           </Link>
 
           <Link
             href="/profile/settings"
-            className="block w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm font-semibold text-white transition-colors hover:bg-white/10"
+            className="block w-full gs-btn-secondary text-center"
           >
             Settings
           </Link>
 
           {error && (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
               {error}
             </div>
           )}
@@ -297,7 +297,7 @@ export default function ProfilePage() {
             type="button"
             onClick={handleLogout}
             disabled={saving}
-            className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-zinc-400 transition-colors hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full gs-btn-secondary text-muted disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? "Signing out..." : "Log out"}
           </button>
@@ -327,10 +327,10 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs text-zinc-500">{label}</span>
+      <span className="text-xs text-faint">{label}</span>
       <div className="relative">
         {prefix && (
-          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-faint">
             {prefix}
           </span>
         )}
@@ -339,9 +339,7 @@ function Field({
           value={value}
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
-          className={`w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-zinc-600 focus:border-zinc-500 ${
-            prefix ? "pl-8" : ""
-          }`}
+          className={`gs-input ${prefix ? "pl-8" : ""}`}
         />
       </div>
     </label>

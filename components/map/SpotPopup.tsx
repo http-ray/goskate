@@ -69,7 +69,7 @@ export default function SpotPopup({
   return (
     <div style={{ fontFamily: "system-ui, sans-serif", minWidth: 200 }}>
       {/* ---- Spot name ---- */}
-      <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: 15, color: "#fff" }}>
+      <p style={{ margin: "0 0 6px", fontWeight: 700, fontSize: 15, color: "#F3F5F8" }}>
         {spot.name}
       </p>
 
@@ -77,22 +77,30 @@ export default function SpotPopup({
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
         <span
           style={{
-            background: spot.type === "skatepark" ? "#6366f1" : "#ef4444",
-            color: "#fff",
+            background:
+              spot.type === "skatepark"
+                ? "rgba(91,168,255,0.18)"
+                : "rgba(255,255,255,0.08)",
+            color: spot.type === "skatepark" ? "#5BA8FF" : "#A2A9B8",
             padding: "2px 8px",
             borderRadius: 9999,
             fontSize: 11,
+            fontWeight: 600,
           }}
         >
           {spot.type === "skatepark" ? "Skatepark" : "Street"}
         </span>
         <span
           style={{
-            background: spot.source === "official" ? "#22c55e" : "#f59e0b",
-            color: spot.source === "official" ? "#fff" : "#000",
+            background:
+              spot.source === "official"
+                ? "rgba(61,214,140,0.18)"
+                : "rgba(245,180,69,0.18)",
+            color: spot.source === "official" ? "#3DD68C" : "#F5B445",
             padding: "2px 8px",
             borderRadius: 9999,
             fontSize: 11,
+            fontWeight: 600,
           }}
         >
           {spot.source === "official" ? "Official" : "User"}
@@ -100,7 +108,7 @@ export default function SpotPopup({
       </div>
 
       {/* ---- Stats row ---- */}
-      <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 13, color: "#a1a1aa" }}>
+      <div style={{ display: "flex", gap: 12, marginTop: 6, fontSize: 13, color: "#A2A9B8" }}>
         {spot.clipsCount !== undefined && (
           <span>🎬 {spot.clipsCount} clip{spot.clipsCount === 1 ? "" : "s"}</span>
         )}
@@ -118,26 +126,36 @@ export default function SpotPopup({
           marginTop: 10,
         }}
       >
-        {/* Get Directions */}
+        {/* Get Directions — primary */}
         <button
           onClick={handleDirections}
-          style={{ ...btnBase, background: "#3b82f6", color: "#fff" }}
+          style={{ ...btnBase, background: "#F4E7D0", color: "#161310" }}
         >
           📍 Directions
         </button>
 
-        {/* View Spot */}
+        {/* View Spot — elevated */}
         <button
           onClick={handleViewSpot}
-          style={{ ...btnBase, background: "#6366f1", color: "#fff" }}
+          style={{
+            ...btnBase,
+            background: "#20232C",
+            color: "#F3F5F8",
+            border: "1px solid #2A2E3A",
+          }}
         >
           👁️ View Spot
         </button>
 
-        {/* Add Clip */}
+        {/* Add Clip — elevated */}
         <button
           onClick={() => onAddClip(spot)}
-          style={{ ...btnBase, background: "#a855f7", color: "#fff" }}
+          style={{
+            ...btnBase,
+            background: "#20232C",
+            color: "#F3F5F8",
+            border: "1px solid #2A2E3A",
+          }}
         >
           🎬 Add Clip
         </button>
@@ -147,8 +165,8 @@ export default function SpotPopup({
           onClick={() => onToggleCheckIn(spot.id)}
           style={{
             ...btnBase,
-            background: isCheckedIn ? "#ef4444" : "#22c55e",
-            color: "#fff",
+            background: isCheckedIn ? "rgba(244,84,78,0.18)" : "rgba(61,214,140,0.18)",
+            color: isCheckedIn ? "#F4544E" : "#3DD68C",
           }}
         >
           {isCheckedIn ? "✖ Check Out" : "📌 Check In"}

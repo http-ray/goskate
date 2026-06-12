@@ -9,9 +9,10 @@
 //   4. The popup stays open until the user taps elsewhere
 //      (Leaflet's default autoClose behaviour).
 //
-// Marker colours:
-//   • Official spots → green (#22c55e), slightly larger
-//   • User spots     → amber (#f59e0b), slightly smaller
+// Marker style:
+//   • Every spot is the GoSkate skate icon (public/images/skateicon.png).
+//   • Official spots render slightly larger than user spots so the
+//     two are still distinguishable at a glance.
 // ============================================================
 
 "use client";
@@ -34,30 +35,29 @@ interface SpotMarkerProps {
 }
 
 /**
- * Build a Leaflet DivIcon — a small coloured circle.
- * The outer wrapper is 44×44 px so it's easy to tap on mobile.
+ * Build a Leaflet DivIcon — the GoSkate skate icon.
+ * The outer wrapper is 44×44 px so it's easy to tap on mobile;
+ * official spots render a touch larger than user spots.
  */
 function createSpotIcon(spot: Spot): L.DivIcon {
   const isOfficial = spot.source === "official";
-  const color = isOfficial ? "#22c55e" : "#f59e0b";
-  const dotSize = isOfficial ? 18 : 14;
+  // Larger, easier-to-see icons — official spots a touch bigger.
+  const iconSize = isOfficial ? 40 : 34;
 
   return L.divIcon({
     className: "", // reset Leaflet's default styling
-    iconSize: [44, 44],
-    iconAnchor: [22, 22], // center the icon on the coordinate
-    popupAnchor: [0, -22], // popup opens above the marker
+    iconSize: [48, 48],
+    iconAnchor: [24, 24], // center the icon on the coordinate
+    popupAnchor: [0, -24], // popup opens above the marker
     html: `
       <div style="
         display:flex;align-items:center;justify-content:center;
-        width:44px;height:44px;cursor:pointer;
+        width:48px;height:48px;cursor:pointer;
       ">
-        <div style="
-          width:${dotSize}px;height:${dotSize}px;
-          background:${color};border-radius:50%;
-          border:2px solid #fff;
-          box-shadow:0 0 6px rgba(0,0,0,0.4);
-        "></div>
+        <img src="/images/skateicon.png" alt="" style="
+          width:${iconSize}px;height:${iconSize}px;object-fit:contain;
+          filter:drop-shadow(0 1px 3px rgba(0,0,0,0.45));
+        " />
       </div>
     `,
   });

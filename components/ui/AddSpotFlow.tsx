@@ -191,18 +191,18 @@ export default function AddSpotFlow({
   if (!user) {
     return (
       <div
-        className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm transition-opacity ${
+        className={`fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4 transition-opacity ${
           isOpen ? "opacity-100" : "pointer-events-none opacity-0"
         }`}
       >
-        <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-          <h2 className="text-xl font-bold text-white">Login Required</h2>
-          <p className="mt-2 text-sm text-zinc-400">
+        <div className="w-full max-w-md rounded-2xl border border-line bg-elevated p-6 shadow-2xl">
+          <h2 className="text-xl font-bold text-ink">Login Required</h2>
+          <p className="mt-2 text-sm text-muted">
             You need to be signed in to add a spot.
           </p>
           <button
             onClick={onClose}
-            className="mt-4 w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition-transform active:scale-[0.99]"
+            className="mt-4 w-full gs-btn-secondary"
           >
             Close
           </button>
@@ -217,9 +217,9 @@ export default function AddSpotFlow({
   if (isMinimized) {
     return (
       <div className="fixed inset-x-4 bottom-4 z-[9999] md:left-auto md:right-4 md:w-96">
-        <div className="rounded-3xl border border-blue-500/50 bg-blue-500/20 px-6 py-4 backdrop-blur-xl">
+        <div className="rounded-2xl border border-info/40 bg-elevated px-6 py-4 shadow-xl">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-info">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="20"
@@ -236,14 +236,14 @@ export default function AddSpotFlow({
               </svg>
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-white">
+              <p className="text-sm font-medium text-ink">
                 Tap the map to place your spot
               </p>
-              <p className="text-xs text-blue-200">Choose the exact location</p>
+              <p className="text-xs text-info">Choose the exact location</p>
             </div>
             <button
               onClick={() => setIsMinimized(false)}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-white transition-colors hover:bg-white/10"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-ink transition-colors hover:bg-white/10"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -269,10 +269,10 @@ export default function AddSpotFlow({
   // ---- Success state ----
   if (step === "success") {
     return (
-      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm">
-        <div className="w-full max-w-md rounded-3xl border border-green-500/30 bg-zinc-950 p-8 shadow-2xl">
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 px-4">
+        <div className="w-full max-w-md rounded-2xl border border-success/30 bg-elevated p-8 shadow-2xl">
           <div className="text-center">
-            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-500/20">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-success/15">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 width="32"
@@ -283,24 +283,24 @@ export default function AddSpotFlow({
                 strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
-                className="text-green-500"
+                className="text-success"
               >
                 <polyline points="20 6 9 17 4 12" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold text-white">Submitted for Review!</h2>
-            <p className="mt-2 text-sm text-zinc-400">
+            <h2 className="text-xl font-bold text-ink">Submitted for Review!</h2>
+            <p className="mt-2 text-sm text-muted">
               Your spot will appear on the map after it's approved by our team.
             </p>
             {nearbySpots > 0 && (
-              <p className="mt-3 text-xs text-yellow-400">
+              <p className="mt-3 text-xs text-warning">
                 ⚠️ {nearbySpots} nearby spot(s) detected — this may be reviewed for
                 duplicates.
               </p>
             )}
             <button
               onClick={handleCloseAndReset}
-              className="mt-6 w-full rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition-transform active:scale-[0.99]"
+              className="mt-6 w-full gs-btn-secondary"
             >
               Done
             </button>
@@ -313,18 +313,18 @@ export default function AddSpotFlow({
   // ---- Step 1: Location ----
   if (step === "location") {
     return (
-      <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/80 px-4 backdrop-blur-sm md:items-center">
-        <div className="w-full max-w-lg rounded-t-3xl border border-white/10 bg-zinc-950 shadow-2xl md:rounded-3xl">
+      <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/70 px-4 md:items-center">
+        <div className="w-full max-w-lg rounded-t-2xl border border-line bg-elevated shadow-2xl md:rounded-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-line px-6 py-4">
             <div>
-              <h2 className="text-xl font-bold text-white">Add a Spot</h2>
-              <p className="text-xs text-zinc-500">Step 1: Choose Location</p>
+              <h2 className="text-xl font-bold text-ink">Add a Spot</h2>
+              <p className="text-xs text-faint">Step 1: Choose Location</p>
             </div>
             <button
               onClick={onClose}
               aria-label="Close"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/10 hover:text-ink"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -348,7 +348,7 @@ export default function AddSpotFlow({
             <div className="space-y-4">
               {/* Selected location display */}
               {location && (
-                <div className="rounded-2xl border border-green-500/30 bg-green-500/10 px-4 py-3">
+                <div className="rounded-2xl border border-success/30 bg-success/10 px-4 py-3">
                   <div className="flex items-center gap-2">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -360,23 +360,23 @@ export default function AddSpotFlow({
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
-                      className="text-green-400"
+                      className="text-success"
                     >
                       <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                       <circle cx="12" cy="10" r="3" />
                     </svg>
                     <div className="flex-1">
-                      <p className="text-sm font-medium text-green-400">
+                      <p className="text-sm font-medium text-success">
                         Location selected
                       </p>
-                      <p className="text-xs text-green-300">{locationLabel}</p>
+                      <p className="text-xs text-success">{locationLabel}</p>
                     </div>
                     <button
                       onClick={() => {
                         setLocation(null);
                         setLocationLabel("");
                       }}
-                      className="text-xs text-zinc-400 hover:text-white"
+                      className="text-xs text-muted hover:text-ink"
                     >
                       Change
                     </button>
@@ -388,10 +388,10 @@ export default function AddSpotFlow({
               <div className="space-y-3">
                 <button
                   onClick={handleUseCurrentLocation}
-                  className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-4 text-left transition-colors hover:bg-zinc-800"
+                  className="w-full gs-card px-4 py-4 text-left transition-colors hover:bg-elevated"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-500/20">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-info/15">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="20"
@@ -402,7 +402,7 @@ export default function AddSpotFlow({
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className="text-blue-400"
+                        className="text-info"
                       >
                         <circle cx="12" cy="12" r="4" />
                         <line x1="12" y1="2" x2="12" y2="6" />
@@ -412,10 +412,10 @@ export default function AddSpotFlow({
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-white">
+                      <p className="text-sm font-medium text-ink">
                         Use Current Location
                       </p>
-                      <p className="text-xs text-zinc-500">
+                      <p className="text-xs text-faint">
                         Use your device's GPS
                       </p>
                     </div>
@@ -424,10 +424,10 @@ export default function AddSpotFlow({
 
                 <button
                   onClick={handlePickOnMap}
-                  className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-4 text-left transition-colors hover:bg-zinc-800"
+                  className="w-full gs-card px-4 py-4 text-left transition-colors hover:bg-elevated"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-green-500/20">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-success/15">
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         width="20"
@@ -438,15 +438,15 @@ export default function AddSpotFlow({
                         strokeWidth="2"
                         strokeLinecap="round"
                         strokeLinejoin="round"
-                        className="text-green-400"
+                        className="text-success"
                       >
                         <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
                         <circle cx="12" cy="10" r="3" />
                       </svg>
                     </div>
                     <div>
-                      <p className="text-sm font-medium text-white">Pick on Map</p>
-                      <p className="text-xs text-zinc-500">
+                      <p className="text-sm font-medium text-ink">Pick on Map</p>
+                      <p className="text-xs text-faint">
                         Tap the map to choose exact location
                       </p>
                     </div>
@@ -456,7 +456,7 @@ export default function AddSpotFlow({
 
               {/* Error message */}
               {error && (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                <div className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
                   {error}
                 </div>
               )}
@@ -465,7 +465,7 @@ export default function AddSpotFlow({
               <button
                 onClick={handleNextToDetails}
                 disabled={!location}
-                className="w-full rounded-2xl bg-green-500 px-4 py-3 text-sm font-semibold text-white transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full gs-btn-primary"
               >
                 Next: Spot Details
               </button>
@@ -479,18 +479,18 @@ export default function AddSpotFlow({
   // ---- Step 2: Details ----
   if (step === "details") {
     return (
-      <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/80 px-4 backdrop-blur-sm md:items-center">
-        <div className="w-full max-w-lg rounded-t-3xl border border-white/10 bg-zinc-950 shadow-2xl md:rounded-3xl">
+      <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/70 px-4 md:items-center">
+        <div className="w-full max-w-lg rounded-t-2xl border border-line bg-elevated shadow-2xl md:rounded-2xl">
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-white/10 px-6 py-4">
+          <div className="flex items-center justify-between border-b border-line px-6 py-4">
             <div>
-              <h2 className="text-xl font-bold text-white">Spot Details</h2>
-              <p className="text-xs text-zinc-500">Step 2: Describe the spot</p>
+              <h2 className="text-xl font-bold text-ink">Spot Details</h2>
+              <p className="text-xs text-faint">Step 2: Describe the spot</p>
             </div>
             <button
               onClick={onClose}
               aria-label="Close"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-zinc-400 transition-colors hover:bg-white/10 hover:text-white"
+              className="flex h-8 w-8 items-center justify-center rounded-full text-muted transition-colors hover:bg-white/10 hover:text-ink"
             >
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -514,7 +514,7 @@ export default function AddSpotFlow({
             <div className="space-y-4">
               {/* Spot name */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300">
+                <label className="block text-sm font-medium text-muted">
                   Spot Name *
                 </label>
                 <input
@@ -523,13 +523,13 @@ export default function AddSpotFlow({
                   onChange={(e) => setSpotName(e.target.value)}
                   placeholder="e.g. Downtown Ledges"
                   required
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-zinc-500"
+                  className="mt-2 w-full gs-input"
                 />
               </div>
 
               {/* Spot type */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300">
+                <label className="block text-sm font-medium text-muted">
                   Type *
                 </label>
                 <div className="mt-2 grid grid-cols-2 gap-2">
@@ -538,8 +538,8 @@ export default function AddSpotFlow({
                     onClick={() => setSpotType("skatepark")}
                     className={`rounded-2xl px-4 py-3 text-sm font-medium transition-colors ${
                       spotType === "skatepark"
-                        ? "bg-white text-black"
-                        : "border border-white/10 bg-zinc-900 text-white hover:bg-zinc-800"
+                        ? "bg-accent text-on-accent"
+                        : "border border-line bg-elevated text-ink hover:bg-line/40"
                     }`}
                   >
                     Skatepark
@@ -549,8 +549,8 @@ export default function AddSpotFlow({
                     onClick={() => setSpotType("street")}
                     className={`rounded-2xl px-4 py-3 text-sm font-medium transition-colors ${
                       spotType === "street"
-                        ? "bg-white text-black"
-                        : "border border-white/10 bg-zinc-900 text-white hover:bg-zinc-800"
+                        ? "bg-accent text-on-accent"
+                        : "border border-line bg-elevated text-ink hover:bg-line/40"
                     }`}
                   >
                     Street Spot
@@ -560,7 +560,7 @@ export default function AddSpotFlow({
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300">
+                <label className="block text-sm font-medium text-muted">
                   Description
                 </label>
                 <textarea
@@ -568,13 +568,13 @@ export default function AddSpotFlow({
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe the spot..."
                   rows={3}
-                  className="mt-2 w-full resize-none rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-zinc-500"
+                  className="mt-2 w-full resize-none gs-input"
                 />
               </div>
 
               {/* Obstacle tags */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300">
+                <label className="block text-sm font-medium text-muted">
                   Obstacles
                 </label>
                 <div className="mt-2 flex flex-wrap gap-2">
@@ -585,8 +585,8 @@ export default function AddSpotFlow({
                       onClick={() => toggleObstacle(obstacle)}
                       className={`rounded-full px-3 py-1.5 text-xs font-medium transition-colors ${
                         selectedObstacles.includes(obstacle)
-                          ? "bg-green-500 text-white"
-                          : "border border-white/10 bg-zinc-900 text-zinc-400 hover:bg-zinc-800"
+                          ? "bg-accent text-on-accent"
+                          : "border border-line bg-elevated text-muted hover:bg-line/40"
                       }`}
                     >
                       {obstacle}
@@ -597,7 +597,7 @@ export default function AddSpotFlow({
 
               {/* Area/address */}
               <div>
-                <label className="block text-sm font-medium text-zinc-300">
+                <label className="block text-sm font-medium text-muted">
                   Area / Address (optional)
                 </label>
                 <input
@@ -605,13 +605,13 @@ export default function AddSpotFlow({
                   value={areaText}
                   onChange={(e) => setAreaText(e.target.value)}
                   placeholder="e.g. Downtown, near 5th St"
-                  className="mt-2 w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-zinc-500"
+                  className="mt-2 w-full gs-input"
                 />
               </div>
 
               {/* Error message */}
               {error && (
-                <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+                <div className="rounded-2xl border border-danger/30 bg-danger/10 px-4 py-3 text-sm text-danger">
                   {error}
                 </div>
               )}
@@ -620,20 +620,20 @@ export default function AddSpotFlow({
               <div className="flex gap-2">
                 <button
                   onClick={handleBackToLocation}
-                  className="flex-1 rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white transition-colors hover:bg-zinc-800"
+                  className="flex-1 gs-btn-secondary"
                 >
                   Back
                 </button>
                 <button
                   onClick={handleSubmit}
                   disabled={submitting || !spotName.trim()}
-                  className="flex-1 rounded-2xl bg-green-500 px-4 py-3 text-sm font-semibold text-white transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 gs-btn-primary"
                 >
                   {submitting ? "Submitting..." : "Submit for Review"}
                 </button>
               </div>
 
-              <p className="text-center text-xs text-zinc-500">
+              <p className="text-center text-xs text-faint">
                 Your submission will be reviewed before appearing on the map.
               </p>
             </div>

@@ -34,14 +34,14 @@ export default function UserBannerCard({
   const handle = profile.username ? `@${profile.username}` : null;
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/10 bg-zinc-950/80 shadow-2xl backdrop-blur">
+    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
 
       {/* ============================================================
           Banner
           Uses banner_url when available; falls back to a gradient.
           ============================================================ */}
       <div
-        className="relative h-28 w-full bg-gradient-to-br from-zinc-800 via-zinc-900 to-black"
+        className="relative h-28 w-full bg-gradient-to-br from-accent/25 via-elevated to-base"
         style={
           profile.banner_url
             ? {
@@ -58,11 +58,11 @@ export default function UserBannerCard({
             <img
               src={profile.avatar_url}
               alt={`${displayName}'s avatar`}
-              className="h-20 w-20 rounded-full border-4 border-black object-cover"
+              className="h-20 w-20 rounded-full border-4 border-surface object-cover"
             />
           ) : (
             // Initial letter fallback
-            <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-black bg-zinc-800 text-3xl font-bold text-zinc-300">
+            <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-surface bg-elevated text-3xl font-bold text-ink">
               {displayName[0]?.toUpperCase() ?? "G"}
             </div>
           )}
@@ -82,13 +82,13 @@ export default function UserBannerCard({
               {displayName}
             </h2>
             {handle && (
-              <p className="text-sm text-zinc-500">{handle}</p>
+              <p className="text-sm text-faint">{handle}</p>
             )}
           </div>
 
           {/* Private badge — shown when profile.is_public is false */}
           {!profile.is_public && (
-            <span className="shrink-0 rounded-full border border-zinc-700 px-2.5 py-0.5 text-xs text-zinc-500">
+            <span className="shrink-0 rounded-full border border-line px-2.5 py-0.5 text-xs text-faint">
               Private
             </span>
           )}
@@ -96,7 +96,7 @@ export default function UserBannerCard({
 
         {/* Bio */}
         {profile.bio && (
-          <p className="mt-2 text-sm leading-6 text-zinc-400">{profile.bio}</p>
+          <p className="mt-2 text-sm leading-6 text-muted">{profile.bio}</p>
         )}
 
         {/* ============================================================
@@ -131,7 +131,7 @@ export default function UserBannerCard({
           <button
             type="button"
             onClick={onClipsClick}
-            className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-white/10 active:scale-[0.99]"
+            className="mt-4 w-full gs-btn-secondary text-center"
           >
             View Clips
           </button>
@@ -154,10 +154,10 @@ function StatPill({
   value: string;
 }) {
   return (
-    <div className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-zinc-900 px-3 py-1.5 text-sm">
+    <div className="flex items-center gap-1.5 rounded-xl border border-line-soft bg-field px-3 py-1.5 text-sm">
       <span aria-hidden="true">{icon}</span>
-      <span className="text-zinc-500">{label}:</span>
-      <span className="font-medium text-white">{value}</span>
+      <span className="text-faint">{label}:</span>
+      <span className="font-medium text-ink">{value}</span>
     </div>
   );
 }

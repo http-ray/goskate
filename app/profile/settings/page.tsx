@@ -40,11 +40,11 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black text-white px-5 py-8 font-sans max-w-lg mx-auto">
+    <div className="min-h-screen bg-base text-ink px-5 py-8 font-sans max-w-lg mx-auto">
       {/* ---- Back ---- */}
       <Link
         href="/profile"
-        className="inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white mb-6"
+        className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink mb-6"
       >
         ← Back to profile
       </Link>
@@ -52,7 +52,7 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
       {infoMessage && (
-        <div className="mb-4 rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-zinc-300">
+        <div className="mb-4 rounded-2xl border border-line bg-elevated px-4 py-3 text-sm text-muted">
           {infoMessage}
         </div>
       )}
@@ -110,7 +110,7 @@ export default function SettingsPage() {
       </SettingsSection>
 
       {/* App version */}
-      <p className="text-center text-xs text-zinc-700 mt-8 mb-4">
+      <p className="text-center text-xs text-faint mt-8 mb-4">
         GoSkate v0.1.0 — built with 🛹
       </p>
     </div>
@@ -130,10 +130,10 @@ function SettingsSection({
 }) {
   return (
     <section className="mb-6">
-      <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">
+      <h2 className="text-xs font-semibold text-faint uppercase tracking-wider mb-2 px-1">
         {title}
       </h2>
-      <div className="rounded-xl bg-zinc-900 divide-y divide-zinc-800 overflow-hidden">
+      <div className="rounded-2xl border border-line-soft bg-surface divide-y divide-line-soft overflow-hidden">
         {children}
       </div>
     </section>
@@ -158,19 +158,19 @@ function SettingsRow({
   const inner = (
     <>
       <span className="text-lg">{icon}</span>
-      <span className={`text-sm ${danger ? "text-red-400" : ""}`}>{label}</span>
+      <span className={`text-sm ${danger ? "text-danger" : ""}`}>{label}</span>
       {value ? (
-        <span className="ml-auto text-xs text-zinc-500 truncate max-w-[45%] text-right">
+        <span className="ml-auto text-xs text-faint truncate max-w-[45%] text-right">
           {value}
         </span>
       ) : (
-        <span className="ml-auto text-zinc-600 text-sm">›</span>
+        <span className="ml-auto text-faint text-sm">›</span>
       )}
     </>
   );
 
   const classes =
-    "flex items-center gap-3 w-full px-4 py-3.5 text-left active:bg-zinc-800 transition-colors";
+    "flex items-center gap-3 w-full px-4 py-3.5 text-left transition-colors hover:bg-white/5 active:bg-white/10";
 
   if (href) {
     return (

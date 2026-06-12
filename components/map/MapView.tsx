@@ -25,37 +25,27 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 
 import { Spot } from "@/types/spot";
 import SpotMarker from "./SpotMarker";
+import SpotHeatLayer from "./SpotHeatLayer";
 import AddClipModal from "@/components/ui/AddClipModal";
 import VisibleSpotsPanel from "@/components/ui/VisibleSpotsPanel";
 import BottomLeftWidget from "@/components/ui/BottomLeftWidget";
 import { fetchPublicSpots } from "@/lib/spotsService";
 
-// ---- Cluster bubble icon (GoSkate brand colours) ----
-// react-leaflet-cluster calls this function to build the icon for each
-// cluster bubble.  We replace the default blue circles with a dark-green
-// bubble that matches the official spot marker colour (#22c55e).
-function createClusterIcon(cluster: any): L.DivIcon {
-  const count = cluster.getChildCount();
-  // Grow the bubble slightly as the cluster gets bigger.
-  const size = count < 10 ? 36 : count < 50 ? 44 : 52;
-
+// ---- Invisible cluster icon (no numbered bubbles) ----
+// react-leaflet-cluster REQUIRES an iconCreateFunction; whatever it returns
+// is what shows on the map for a collapsed cluster.  We deliberately return
+// an empty, zero-size icon so NO numbered circles (3, 14, 92...) ever render.
+//
+// Clustering still runs underneath purely for performance — at far zoom it
+// collapses hundreds of markers into a handful of invisible clusters instead
+// of drawing them all.  Visual density is carried entirely by the
+// SpotHeatLayer.  As the user zooms in, clusters break apart into the real
+// skateboard markers.
+function createClusterIcon(): L.DivIcon {
   return L.divIcon({
-    className: "", // clear Leaflet's default class
-    iconSize: [size, size],
-    iconAnchor: [size / 2, size / 2],
-    html: `
-      <div style="
-        display:flex;align-items:center;justify-content:center;
-        width:${size}px;height:${size}px;
-        background:rgba(34,197,94,0.88);
-        border-radius:50%;
-        border:2px solid rgba(255,255,255,0.25);
-        box-shadow:0 2px 8px rgba(0,0,0,0.55);
-        color:#fff;font-size:13px;font-weight:700;
-        font-family:system-ui,sans-serif;
-        cursor:pointer;
-      ">${count}</div>
-    `,
+    className: "gs-hidden-cluster",
+    iconSize: [0, 0],
+    html: "",
   });
 }
 
@@ -318,12 +308,17 @@ export default function MapView() {
         // the correct initial center/zoom is always applied.
         key={isMobile ? "mobile-map" : "desktop-map"}
       >
-        {/* --- Dark-themed OpenStreetMap tiles --- */}
+        {/* --- Standard OpenStreetMap light tiles --- */}
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           minZoom={minZoom}
         />
+
+        {/* --- Subtle density heatmap (sits below markers) ---
+             Lives in the overlayPane beneath the markerPane, so it never
+             intercepts marker/cluster clicks or popups. */}
+        <SpotHeatLayer spots={publicSpots} />
 
         {/* --- Markers grouped into clusters when zoomed out ---
              react-leaflet-cluster wraps children using react-leaflet v5's
@@ -353,14 +348,14 @@ export default function MapView() {
 
       {/* --- Loading indicator --- */}
       {isLoading && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-zinc-900/90 text-white text-sm rounded-full backdrop-blur">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 border border-line bg-elevated text-ink text-sm rounded-full">
           Loading skateparks...
         </div>
       )}
 
       {/* --- Error indicator --- */}
       {loadError && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-red-900/90 text-white text-sm rounded-full backdrop-blur">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 px-4 py-2 border border-danger/30 bg-danger/15 text-danger text-sm rounded-full">
           {loadError}
         </div>
       )}

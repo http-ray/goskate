@@ -1,9 +1,46 @@
 @import "tailwindcss";
 
 /* ============================================================
-   GoSkate — Global styles
-   Dark skater theme + Leaflet popup overrides.
+   GoSkate — Global styles & design tokens
+   Dark, map-focused, slightly game-inspired theme.
+
+   All screens consume these semantic tokens via Tailwind
+   utilities (e.g. bg-surface, text-ink, border-line,
+   bg-accent, text-on-accent, bg-success/15 text-success).
+   Edit a value here and it propagates across the whole app.
    ============================================================ */
+
+@theme {
+  /* --- Surfaces (dark background ramp) --- */
+  --color-base: #0e0f13; /* app background */
+  --color-surface: #16181f; /* cards, panels */
+  --color-elevated: #20232c; /* popovers, modals, raised controls */
+  --color-field: #1a1d24; /* inputs, search */
+
+  /* --- Hairline borders --- */
+  --color-line: #2a2e3a; /* default 1px border */
+  --color-line-soft: #21242d; /* subtle divider */
+
+  /* --- Text --- */
+  --color-ink: #f3f5f8; /* primary text */
+  --color-muted: #a2a9b8; /* secondary text */
+  --color-faint: #6a7180; /* tertiary / placeholder */
+
+  /* --- Accent (cream / off-white — skate-wheel inspired, primary actions) --- */
+  --color-accent: #f4e7d0;
+  --color-accent-press: #fff1d6;
+  --color-on-accent: #161310; /* warm near-black text/icons on cream fills */
+
+  /* --- Status --- */
+  --color-success: #3dd68c; /* approved / official */
+  --color-warning: #f5b445; /* pending / user */
+  --color-danger: #f4544e; /* rejected / destructive */
+  --color-info: #5ba8ff; /* skatepark / informational */
+  --color-flag: #c084fc; /* flagged */
+
+  /* --- Radius scale --- */
+  --radius-xl2: 22px;
+}
 
 /* --- Base resets for full-screen map --- */
 html,
@@ -11,24 +48,69 @@ body {
   height: 100%;
   margin: 0;
   padding: 0;
-  background: #000;
-  color: #ededed;
+  background: var(--color-base);
+  color: var(--color-ink);
   font-family: var(--font-geist-sans), system-ui, sans-serif;
 }
 
-/* --- Leaflet popup overrides (dark theme) --- */
+/* ============================================================
+   Reusable component classes
+   Thin wrappers over the tokens so screens share one source of
+   truth for cards / buttons / inputs / chips / badges.
+   ============================================================ */
+@layer components {
+  /* Surface card */
+  .gs-card {
+    @apply rounded-2xl border border-line-soft bg-surface;
+  }
+
+  /* Primary action — lime */
+  .gs-btn-primary {
+    @apply rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-on-accent transition-colors hover:bg-accent-press active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Secondary action — elevated surface */
+  .gs-btn-secondary {
+    @apply rounded-xl border border-line bg-elevated px-4 py-3 text-sm font-semibold text-ink transition-colors hover:bg-line/40 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* Ghost action */
+  .gs-btn-ghost {
+    @apply rounded-xl px-4 py-3 text-sm font-semibold text-muted transition-colors hover:bg-white/5 hover:text-ink;
+  }
+
+  /* Text input / search field */
+  .gs-input {
+    @apply w-full rounded-xl border border-line-soft bg-field px-4 py-3 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-accent/50;
+  }
+
+  /* Filter chip — default */
+  .gs-chip {
+    @apply whitespace-nowrap rounded-full border border-line bg-elevated px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-line/40;
+  }
+
+  /* Filter chip — active */
+  .gs-chip-active {
+    @apply whitespace-nowrap rounded-full border border-accent bg-accent/15 px-3 py-1.5 text-xs font-medium text-accent transition-colors;
+  }
+}
+
+/* ============================================================
+   Leaflet popup overrides (dark theme)
+   ============================================================ */
 
 /* The popup bubble background */
 .goskate-popup .leaflet-popup-content-wrapper {
-  background: #18181b !important;
-  color: #fff !important;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+  background: var(--color-elevated) !important;
+  color: var(--color-ink) !important;
+  border: 1px solid var(--color-line) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5) !important;
 }
 
 /* Inner content padding */
 .goskate-popup .leaflet-popup-content {
-  margin: 12px 14px !important;
+  margin: 14px 16px !important;
   line-height: 1.4;
   /* Let the popup expand for the action buttons */
   min-width: 200px;
@@ -36,17 +118,17 @@ body {
 
 /* The small triangle / tip pointing at the marker */
 .goskate-popup .leaflet-popup-tip {
-  background: #18181b !important;
+  background: var(--color-elevated) !important;
 }
 
 /* Close button */
 .goskate-popup .leaflet-popup-close-button {
-  color: #a1a1aa !important;
+  color: var(--color-faint) !important;
   font-size: 18px !important;
   padding: 4px 8px !important;
 }
 
 .goskate-popup .leaflet-popup-close-button:hover {
-  color: #fff !important;
+  color: var(--color-ink) !important;
   background: transparent !important;
 }

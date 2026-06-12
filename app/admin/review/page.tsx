@@ -174,7 +174,7 @@ export default function AdminReviewPage() {
 
   if (authLoading || !accessChecked) {
     return (
-      <div className="flex h-screen items-center justify-center bg-zinc-950 text-white">
+      <div className="flex h-screen items-center justify-center bg-base text-ink">
         Loading...
       </div>
     );
@@ -185,20 +185,20 @@ export default function AdminReviewPage() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white">
+    <div className="min-h-screen bg-base text-ink">
       {/* Header */}
-      <div className="border-b border-white/10 bg-zinc-900/50 backdrop-blur">
+      <div className="border-b border-line bg-surface">
         <div className="mx-auto max-w-7xl px-4 py-6">
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Admin Review</h1>
-              <p className="mt-1 text-sm text-zinc-400">
+              <p className="mt-1 text-sm text-muted">
                 {pendingSpots.length} pending spot{pendingSpots.length !== 1 ? "s" : ""}
               </p>
             </div>
             <button
               onClick={() => router.push("/")}
-              className="rounded-2xl border border-white/10 bg-zinc-800 px-4 py-2 text-sm transition-colors hover:bg-zinc-700"
+              className="rounded-xl border border-line bg-elevated px-4 py-2 text-sm text-ink transition-colors hover:bg-line/40"
             >
               Back to Map
             </button>
@@ -209,15 +209,15 @@ export default function AdminReviewPage() {
       {/* Pending spots list */}
       <div className="mx-auto max-w-7xl px-4 py-8">
         {pendingSpots.length === 0 ? (
-          <div className="rounded-3xl border border-white/10 bg-zinc-900 px-8 py-12 text-center">
-            <p className="text-zinc-400">No pending spots to review.</p>
+          <div className="rounded-2xl border border-line-soft bg-surface px-8 py-12 text-center">
+            <p className="text-muted">No pending spots to review.</p>
           </div>
         ) : (
           <div className="space-y-4">
             {pendingSpots.map((spot) => (
               <div
                 key={spot.id}
-                className="rounded-3xl border border-white/10 bg-zinc-900 p-6"
+                className="rounded-2xl border border-line-soft bg-surface p-6"
               >
                 <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   {/* Spot details */}
@@ -228,18 +228,18 @@ export default function AdminReviewPage() {
                         <img
                           src={spot.submitter_avatar_url}
                           alt={spot.submitter_username || "User"}
-                          className="h-10 w-10 rounded-full bg-zinc-800"
+                          className="h-10 w-10 rounded-full bg-elevated"
                         />
                       ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-sm text-zinc-400">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-elevated text-sm text-muted">
                           👤
                         </div>
                       )}
 
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold">{spot.display_name}</h3>
-                        <p className="text-sm text-zinc-400">
-                          by <span className="text-white">{spot.submitter_username || "Unknown"}</span>
+                        <p className="text-sm text-muted">
+                          by <span className="text-ink">{spot.submitter_username || "Unknown"}</span>
                           {" • "}
                           {new Date(spot.created_at).toLocaleDateString()}
                         </p>
@@ -248,22 +248,22 @@ export default function AdminReviewPage() {
 
                     <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
                       <div>
-                        <span className="text-zinc-500">Type:</span>{" "}
-                        <span className="capitalize text-white">{spot.type}</span>
+                        <span className="text-faint">Type:</span>{" "}
+                        <span className="capitalize text-ink">{spot.type}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500">Location:</span>{" "}
-                        <span className="text-white">
+                        <span className="text-faint">Location:</span>{" "}
+                        <span className="text-ink">
                           {spot.latitude.toFixed(4)}, {spot.longitude.toFixed(4)}
                         </span>
                       </div>
                       <div>
-                        <span className="text-zinc-500">Source:</span>{" "}
-                        <span className="capitalize text-white">{spot.source}</span>
+                        <span className="text-faint">Source:</span>{" "}
+                        <span className="capitalize text-ink">{spot.source}</span>
                       </div>
                       {spot.possible_duplicate && (
                         <div className="col-span-2 md:col-span-1">
-                          <span className="rounded-full bg-yellow-500/20 px-2 py-1 text-xs text-yellow-400">
+                          <span className="rounded-full bg-warning/15 px-2 py-1 text-xs text-warning">
                             ⚠️ Possible Duplicate
                           </span>
                         </div>
@@ -271,18 +271,18 @@ export default function AdminReviewPage() {
                     </div>
 
                     {spot.description && (
-                      <div className="rounded-2xl border border-white/5 bg-zinc-800/50 p-3">
-                        <p className="text-sm text-zinc-300">{spot.description}</p>
+                      <div className="rounded-2xl border border-line-soft bg-field p-3">
+                        <p className="text-sm text-muted">{spot.description}</p>
                       </div>
                     )}
 
                     {spot.obstacle_tags && spot.obstacle_tags.length > 0 && (
                       <div className="flex flex-wrap gap-2">
-                        <span className="text-sm text-zinc-500">Tags:</span>
+                        <span className="text-sm text-faint">Tags:</span>
                         {spot.obstacle_tags.map((tag) => (
                           <span
                             key={tag}
-                            className="rounded-full bg-green-500/20 px-2 py-1 text-xs text-green-400"
+                            className="rounded-full bg-success/15 px-2 py-1 text-xs text-success"
                           >
                             {tag}
                           </span>
@@ -292,8 +292,8 @@ export default function AdminReviewPage() {
 
                     {spot.area_text && (
                       <div className="text-sm">
-                        <span className="text-zinc-500">Area:</span>{" "}
-                        <span className="text-white">{spot.area_text}</span>
+                        <span className="text-faint">Area:</span>{" "}
+                        <span className="text-ink">{spot.area_text}</span>
                       </div>
                     )}
                   </div>
@@ -303,21 +303,21 @@ export default function AdminReviewPage() {
                     <button
                       onClick={() => handleAction(spot.id, "approve")}
                       disabled={actioningSpotId === spot.id}
-                      className="flex-1 rounded-2xl bg-green-500 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-green-600 disabled:opacity-50 md:flex-none"
+                      className="flex-1 rounded-xl bg-success px-4 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-success/90 disabled:opacity-50 md:flex-none"
                     >
                       Approve
                     </button>
                     <button
                       onClick={() => openNoteModal(spot, "reject")}
                       disabled={actioningSpotId === spot.id}
-                      className="flex-1 rounded-2xl bg-red-500/20 px-4 py-2 text-sm font-semibold text-red-400 transition-colors hover:bg-red-500/30 disabled:opacity-50 md:flex-none"
+                      className="flex-1 rounded-xl border border-danger/30 bg-danger/15 px-4 py-2 text-sm font-semibold text-danger transition-colors hover:bg-danger/25 disabled:opacity-50 md:flex-none"
                     >
                       Reject
                     </button>
                     <button
                       onClick={() => openNoteModal(spot, "flag")}
                       disabled={actioningSpotId === spot.id}
-                      className="flex-1 rounded-2xl bg-yellow-500/20 px-4 py-2 text-sm font-semibold text-yellow-400 transition-colors hover:bg-yellow-500/30 disabled:opacity-50 md:flex-none"
+                      className="flex-1 rounded-xl border border-flag/30 bg-flag/15 px-4 py-2 text-sm font-semibold text-flag transition-colors hover:bg-flag/25 disabled:opacity-50 md:flex-none"
                     >
                       Flag
                     </button>
@@ -331,12 +331,12 @@ export default function AdminReviewPage() {
 
       {/* Moderation note modal */}
       {showNoteModal && currentSpot && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-white/10 bg-zinc-950 p-6 shadow-2xl">
-            <h2 className="text-xl font-bold text-white">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-4-sm">
+          <div className="w-full max-w-md rounded-2xl border border-line bg-elevated p-6 shadow-2xl">
+            <h2 className="text-xl font-bold text-ink">
               {currentAction === "reject" ? "Reject" : "Flag"} Spot
             </h2>
-            <p className="mt-2 text-sm text-zinc-400">
+            <p className="mt-2 text-sm text-muted">
               Add a note explaining why this spot is being {currentAction}d.
             </p>
 
@@ -345,7 +345,7 @@ export default function AdminReviewPage() {
               onChange={(e) => setModerationNote(e.target.value)}
               placeholder="Enter moderation notes..."
               rows={4}
-              className="mt-4 w-full resize-none rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white placeholder-zinc-600 outline-none transition-colors focus:border-zinc-500"
+              className="mt-4 w-full resize-none gs-input"
             />
 
             <div className="mt-4 flex gap-2">
@@ -356,13 +356,13 @@ export default function AdminReviewPage() {
                   setCurrentAction(null);
                   setCurrentSpot(null);
                 }}
-                className="flex-1 rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white transition-colors hover:bg-zinc-800"
+                className="flex-1 gs-btn-secondary"
               >
                 Cancel
               </button>
               <button
                 onClick={submitWithNote}
-                className="flex-1 rounded-2xl bg-green-500 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-green-600"
+                className="flex-1 gs-btn-primary"
               >
                 Submit
               </button>

@@ -146,3 +146,52 @@ export async function updateProfile(
 
   return data as Profile;
 }
+
+// ============================================================
+// getProfileByUsername
+//
+// Fetches a public profile by username — used by /profile/[username].
+// Returns null if the username is not found or the profile is private.
+// For own-profile access (even if private), use getProfile(userId) instead.
+// ============================================================
+export async function getProfileByUsername(
+  username: string
+): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("username", username)
+    .eq("is_public", true)
+    .single();
+
+  if (error) {
+    if (error.code === "PGRST116") return null;
+    throw error;
+  }
+
+  return data as Profile;
+}
+
+// ============================================================
+// searchProfiles
+//
+// Searches public profiles by username, display_name, or local_park.
+// Returns up to 20 results. Only public profiles are returned.
+// ============================================================
+export async function searchProfiles(query: string): Promise<Profile[]> {
+  const q = query.trim();
+  if (!q) return [];
+
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("is_public", true)
+    .or(
+      `username.ilike.%${q}%,display_name.ilike.%${q}%,local_park.ilike.%${q}%`
+    )
+    .limit(20);
+
+  if (error) throw error;
+
+  return (data || []) as Profile[];
+}

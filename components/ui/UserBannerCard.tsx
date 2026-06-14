@@ -18,15 +18,19 @@
 // ============================================================
 
 import type { Profile } from "@/lib/profilesService";
+import type { FollowCounts } from "@/types/social";
 
 type UserBannerCardProps = {
   profile: Profile;
+  /** Optional — follower/following counts to display on the card. */
+  followCounts?: FollowCounts;
   /** Optional — show a "View Clips" button that calls this when tapped. */
   onClipsClick?: () => void;
 };
 
 export default function UserBannerCard({
   profile,
+  followCounts,
   onClipsClick,
 }: UserBannerCardProps) {
   // Prefer display_name, fall back to username, then a generic placeholder
@@ -123,10 +127,21 @@ export default function UserBannerCard({
           )}
         </div>
 
-        {/* ============================================================
-            Clips button — placeholder for V1.
-            Only rendered when onClipsClick is provided.
-            ============================================================ */}
+        {/* Follow counts — shown when provided */}
+        {followCounts && (
+          <div className="mt-4 flex gap-5 text-sm">
+            <span>
+              <span className="font-semibold text-ink">{followCounts.following}</span>{" "}
+              <span className="text-muted">Following</span>
+            </span>
+            <span>
+              <span className="font-semibold text-ink">{followCounts.followers}</span>{" "}
+              <span className="text-muted">Followers</span>
+            </span>
+          </div>
+        )}
+
+        {/* Clips button — only rendered when onClipsClick is provided */}
         {onClipsClick && (
           <button
             type="button"

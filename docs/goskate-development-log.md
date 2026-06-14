@@ -989,3 +989,682 @@ Storing, transcoding, and streaming video is expensive. A 10-second clip might b
 11. After deployment, begin planning the social/profile feature set.
 
 ---
+
+## Session: Social Layer — Profiles, Follows, and Clips
+
+**Date:** June 13, 2026
+**Areas touched:** types, Supabase schema, profilesService, new followsService, new clipsService, profile/edit, profile page, friends page, public profile page, user search, UserBannerCard, ProfileCard, ClipCard, AddClipForm
+
+---
+
+### 1. Session Overview
+
+This session built the social layer for GoSkate from scratch. The map and moderation features were already complete. What was missing was a way for skaters to find each other, follow each other, and share clips from their profile.
+
+The goals set before building:
+
+- Skaters can upload a real avatar image from their device (not paste a URL).
+- Every public profile has a permanent URL at `/profile/[username]` that anyone can visit.
+- A search page lets users find other skaters by name, username, or local park.
+- Users can follow each other with a simple one-directional follow system.
+- Users can add clips from TikTok, Instagram, YouTube, or any platform by pasting a link. No native video upload.
+- Clips show a cover image (optional upload) and an "Open original" link. No embeds.
+- Private profiles remain completely hidden — search results, clip reads, and profile pages all respect the `is_public` flag.
+
+Everything was built without changing the existing `spots` table, map logic, heatmap, moderation, or admin page.
+
+---
+
+### 2. New Database Tables
+
+Two new tables were added. Both are defined in `supabase/social-schema.sql` and must be created in the Supabase SQL editor before the social features work.
+
+#### `user_follows`
+
+```sql
+CREATE TABLE user_follows (
+  follower_id  UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  following_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  created_at   TIMESTAMPTZ DEFAULT now(),
+  PRIMARY KEY (follower_id, following_id),
+  CHECK (follower_id != following_id)
+);
+```
+
+The composite primary key `(follower_id, following_id)` means there can only ever be one follow relationship between any two users — duplicates are prevented at the database level, not just the frontend.
+
+The `CHECK (follower_id != following_id)` constraint makes it impossible to follow yourself. This is enforced at the DB layer, so it holds even if a bug in the frontend tries to submit it.
+
+The `ON DELETE CASCADE` on both columns means: if a user deletes their account, all their follows (both as follower and as someone being followed) are cleaned up automatically.
+
+#### `profile_clips`
+
+```sql
+CREATE TABLE profile_clips (
+  id              UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id         UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  title           TEXT,
+  caption         TEXT,
+  platform        TEXT CHECK (platform IN ('tiktok', 'instagram', 'youtube', 'other')) NOT NULL,
+  external_url    TEXT NOT NULL,
+  cover_image_url TEXT,
+  spot_id         UUID REFERENCES spots(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ DEFAULT now()
+);
+```
+
+The `platform` column uses a `CHECK` constraint to enforce valid values — only `tiktok`, `instagram`, `youtube`, or `other` are accepted. This prevents garbage data without needing application-level validation as the only guard.
+
+`spot_id` is optional and uses `ON DELETE SET NULL` — if the referenced spot is deleted, the clip stays on the profile but just loses its spot reference. This avoids cascading deletes wiping out clips because a spot was removed.
+
+`external_url` is required. `cover_image_url` is optional — clips work without a cover, which is important for MVP where users may not have a good thumbnail to upload.
+
+---
+
+### 3. RLS Policy Design
+
+#### `user_follows` — 3 policies
+
+| Policy | Operation | Rule |
+|--------|-----------|------|
+| Anyone can view follows | SELECT | `USING (true)` — public |
+| Users can follow others | INSERT | `WITH CHECK (auth.uid() = follower_id)` |
+| Users can unfollow | DELETE | `USING (auth.uid() = follower_id)` |
+
+Follow relationships are public because follower/following counts need to be readable by anyone visiting a public profile. There is no private follow system.
+
+The INSERT and DELETE policies tie the operation to the `follower_id` column — a user can only create or delete follow rows where they are the follower. The database enforces this even if someone crafts a raw API request.
+
+#### `profile_clips` — 5 policies
+
+| Policy | Operation | Rule |
+|--------|-----------|------|
+| Public clips are readable | SELECT | Profile must have `is_public = true` |
+| Users can read own clips | SELECT | `auth.uid() = user_id` |
+| Users can add clips | INSERT | `WITH CHECK (auth.uid() = user_id)` |
+| Users can update clips | UPDATE | `USING (auth.uid() = user_id)` |
+| Users can delete clips | DELETE | `USING (auth.uid() = user_id)` |
+
+There are two separate SELECT policies because RLS policies are OR-combined — a row is readable if *any* policy grants access. The first policy lets anyone read clips from a public profile. The second policy lets a user always read their own clips even if their profile is private. Together, they handle both cases correctly.
+
+---
+
+### 4. Supabase Storage Buckets
+
+Two public Storage buckets were added. Both are created by `supabase/social-schema.sql`.
+
+**`avatars` bucket**
+- Avatar path: `{userId}/avatar.{ext}`
+- Banner path: `{userId}/banner.{ext}` (same bucket, different filename)
+- Storage policies: authenticated users can upload, update, and delete files only under their own `{userId}/` prefix
+- Public read: anyone can read (needed to serve `avatar_url` and `banner_url` via CDN link)
+
+Using the same fixed path `{userId}/avatar.jpg` for each user means uploading a new avatar automatically overwrites the old one. No old files pile up in storage and no cleanup is needed.
+
+**`clip-covers` bucket**
+- Cover path: `{userId}/{clipId}.{ext}`
+- Same storage policies as `avatars` — users can only touch their own files
+- Public read: cover images appear on public profile pages
+
+---
+
+### 5. Avatar Upload — Profile Edit Page
+
+Before this session, avatar and banner were plain URL text inputs. Users had to host an image somewhere and paste a link. That's a bad user experience and essentially gates the feature to people who already have a CDN.
+
+The new approach in `app/profile/edit/page.tsx`:
+
+1. A hidden `<input type="file">` is attached to a visible "Upload Avatar" button.
+2. When a file is selected, it is validated before upload: type must be JPEG, PNG, or WebP; size must be 5 MB or less.
+3. Validation passes → file uploads to `avatars/{userId}/avatar.{ext}` via Supabase Storage.
+4. Supabase returns a public URL → that URL is immediately saved to `profiles.avatar_url` via `updateProfile()`.
+5. The avatar preview updates in the UI.
+
+The upload-then-save pattern (upload file, then save URL to the profiles row) is the standard approach for Supabase Storage. The Storage bucket holds the file; the database row holds the URL string that points to it.
+
+Banner upload works the same way but uses the path `{userId}/banner.{ext}`.
+
+---
+
+### 6. Public Profile Page — `/profile/[username]`
+
+Before this session, there was no way to view another user's profile. `getProfileByUsername()` was added to `lib/profilesService.ts` to look up a public profile by username:
+
+```ts
+const { data } = await supabase
+  .from("profiles")
+  .select("*")
+  .eq("username", username)
+  .eq("is_public", true)
+  .single();
+```
+
+The `.eq("is_public", true)` filter is critical — it means this function only ever returns public profiles. Even if someone requests a private profile's username directly in the URL, the query returns nothing. The page then shows "Profile not found" without exposing any data. This is the correct privacy model: do not reveal that a private profile exists at all.
+
+**Page layout:**
+- Full-width banner
+- Avatar overlapping the banner edge (same visual pattern as the own-profile card)
+- Follow button (if signed in and not own profile) or "Sign in to Follow" link
+- Follower and following counts (read-only for now)
+- Stats pills (stance, local park, parks visited)
+- Bio
+- Clips grid (read-only `ClipCard` components)
+
+**Own profile detection:**
+The page checks `user.id === profile.id`. If true, the Follow button is replaced with an "Edit Profile" link. This prevents the confusing situation of seeing a Follow button on your own profile.
+
+---
+
+### 7. User Search — `/users/search`
+
+`searchProfiles()` was added to `lib/profilesService.ts`:
+
+```ts
+supabase
+  .from("profiles")
+  .select("*")
+  .eq("is_public", true)
+  .or(`username.ilike.%${q}%,display_name.ilike.%${q}%,local_park.ilike.%${q}%`)
+  .limit(20)
+```
+
+The `.ilike()` operator is case-insensitive substring matching — searching "tony" would match "Tony Hawk" or "antony". Private profiles are excluded by `.eq("is_public", true)` before any search logic runs.
+
+The search page debounces input by 300ms using `setTimeout` and `clearTimeout`. This means the Supabase query only runs after the user stops typing for 300ms — not on every keystroke. This prevents flooding the database with a query for every single character typed.
+
+Results render as `ProfileCard` components, each showing avatar, display name, handle, stance, local park, and a Follow button.
+
+---
+
+### 8. Follow System
+
+The follow system is one-directional (like Twitter/Instagram), not mutual (like Facebook friends). One user follows another; the other user does not need to approve.
+
+**Why one-directional:**
+- Simpler database model — one row per relationship, no `status` enum.
+- No notification logic needed (acceptance/rejection notifications are complex).
+- More natural for a skate community where content creators want public reach.
+
+**`lib/followsService.ts` functions:**
+
+| Function | What it does |
+|----------|-------------|
+| `followUser(followingId)` | INSERT into `user_follows`; gets current user from Supabase auth |
+| `unfollowUser(followingId)` | DELETE from `user_follows` |
+| `getFollowCounts(userId)` | Two parallel SELECT COUNT queries — followers and following |
+| `getFollowStatus(targetUserId)` | Returns true/false: does current user follow this person? |
+| `getFollowers(userId)` | JOIN with profiles to get the list of people who follow userId |
+| `getFollowing(userId)` | JOIN with profiles to get the list of people userId follows |
+
+The `getFollowing` and `getFollowers` functions use Supabase's foreign key join syntax:
+
+```ts
+supabase
+  .from("user_follows")
+  .select("following_id, profiles!user_follows_following_id_fkey(*)")
+  .eq("follower_id", userId)
+```
+
+The `profiles!user_follows_following_id_fkey(*)` syntax tells Supabase to join the `profiles` table using the named foreign key constraint (`user_follows_following_id_fkey`). This returns the full profile row for each followed user in a single query — no N+1 problem.
+
+**Friends page repurposed:**
+`/profile/friends` was a "Coming Soon" placeholder. It's now a real page with two tabs — Following and Followers — that renders `ProfileCard` lists. A "Find skaters →" link navigates to `/users/search`.
+
+---
+
+### 9. Profile Clips
+
+#### Why external links, not video uploads
+
+Storing and serving video requires:
+- Storage at scale (a 10-second TikTok clip is ~8 MB)
+- CDN for global delivery
+- Video transcoding (different browsers need different formats)
+- Player logic
+
+A link to a TikTok or YouTube video costs zero to store and the video is already transcoded, captioned, and mobile-optimized by the platform. For an MVP social layer this is the right tradeoff. The user experience of tapping "Open original" and landing in TikTok is actually better than a native player — the user is in the platform where they can like, comment, and share.
+
+#### Why no embeds at launch
+
+TikTok embeds require oEmbed API calls and can be blocked by privacy settings. Instagram embeds are restricted and require Facebook app review. YouTube iframes work but add complexity (loading state, iframe sandbox, responsive sizing).
+
+The MVP display is: cover image (if uploaded) or a platform-colored placeholder card, a title, and an "Open original" link. This renders reliably on every platform, every browser, with no external dependencies.
+
+#### `AddClipForm` — how it works
+
+1. User pastes a URL.
+2. The form auto-detects the platform from the URL (`tiktok.com` → TikTok, `youtube.com` → YouTube, etc.) and sets the Platform dropdown.
+3. User optionally fills title, caption, and uploads a cover image.
+4. On submit: `addClip()` inserts the clip row first to get an ID.
+5. If a cover image was provided: `uploadClipCover(userId, clipId, file)` uploads it to `clip-covers/{userId}/{clipId}.ext`.
+6. The cover URL is written back to the clip row with a second update.
+
+The two-step approach (insert → upload → update) is necessary because the clip ID (used as the storage path) is only known after the INSERT. This is a common pattern with Supabase: generate UUIDs at the DB layer via `gen_random_uuid()`, then use the returned ID for related storage operations.
+
+---
+
+### 10. Privacy Model Summary
+
+The privacy system works at two levels:
+
+**Profile level (`profiles.is_public`)**
+- `false` → profile is completely invisible. `getProfileByUsername` returns nothing. Search excludes the user. `/profile/[username]` shows "Profile not found."
+- `true` → profile is publicly visible and searchable.
+
+**Clip level**
+- Clips from a public profile are readable by anyone (RLS: `profiles.is_public = true`).
+- Users always read their own clips regardless of profile visibility (second SELECT policy).
+- Clips from a private profile are invisible to others even if someone queries the `profile_clips` table directly using the anon key.
+
+This means a user can make their profile private at any time and their clips immediately become inaccessible to others — no manual clip visibility toggle needed.
+
+---
+
+### 11. Concepts Learned (Beginner-Friendly)
+
+#### Why a composite primary key prevents duplicate follows
+
+A primary key must be unique. Setting the primary key to `(follower_id, following_id)` means the combination of both values must be unique — the same user cannot follow the same person twice. If `followUser()` is called twice accidentally, the second INSERT will fail with a unique constraint violation, not silently create a duplicate row.
+
+#### What `ON DELETE CASCADE` means
+
+When a user deletes their account (`auth.users` row is removed), Postgres can automatically remove all related rows in other tables. `REFERENCES profiles(id) ON DELETE CASCADE` on `user_follows` means: "if the profile this row points to is deleted, delete this follow row too." Without cascade, deleting a user would fail because follow rows would still reference the deleted profile ID.
+
+#### Why RLS SELECT policies are OR-combined
+
+Postgres evaluates multiple RLS policies with OR logic: a row is visible if *any* policy allows it. This is why `profile_clips` has two SELECT policies — one for public profiles and one for own clips. If they were combined into one policy with AND logic, a user would need both conditions to be true simultaneously (which is impossible when your own profile is private).
+
+#### Why debouncing search prevents wasted API calls
+
+Without debouncing, typing "rayshun" would trigger 7 separate Supabase queries — one per keystroke. With 300ms debouncing, the timer resets on each keystroke. Only after the user stops typing for 300ms does the final query run. For a search feature, this is essential: it reduces database load, prevents flickering results, and avoids rate limit issues.
+
+#### What Supabase's foreign key join syntax does
+
+`profiles!user_follows_following_id_fkey(*)` tells Supabase which foreign key to use for a join. Supabase can infer joins automatically, but when a table has *multiple* foreign keys to the same table (like `user_follows` has both `follower_id` and `following_id` pointing to `profiles`), the explicit constraint name is required to remove ambiguity. Without it, Supabase wouldn't know whether to join on `follower_id` or `following_id`.
+
+#### Why fixed storage paths replace old files automatically
+
+`supabase.storage.upload(path, file, { upsert: true })` overwrites an existing file at the same path. By always using the same path for a user's avatar (`{userId}/avatar.jpg`), the new upload automatically replaces the old file without any cleanup code. If paths were unique per upload (e.g., using a timestamp), old avatar files would accumulate indefinitely and need a separate cleanup job.
+
+#### Why external video links are MVP-correct
+
+The cost model for native video: storage (GB at rest), transcoding (CPU time), CDN egress (GB per view), a video player (JavaScript library), and accessibility (captions). The cost model for a link: zero. The tradeoff is that you don't control the content — if someone deletes their TikTok, the clip disappears. For MVP this is acceptable. Build the infrastructure only when the product has proven it's worth the operational cost.
+
+---
+
+### 12. Files Changed This Session
+
+#### New files
+
+| File | Purpose |
+|------|---------|
+| `types/social.ts` | `Follow`, `ProfileClip`, `NewClipInput`, `FollowCounts` TypeScript types |
+| `supabase/social-schema.sql` | SQL for `user_follows` + `profile_clips` tables, all RLS policies, and Storage bucket creation — run once in Supabase SQL editor |
+| `lib/followsService.ts` | `followUser`, `unfollowUser`, `getFollowCounts`, `getFollowStatus`, `getFollowers`, `getFollowing` |
+| `lib/clipsService.ts` | `getClipsForUser`, `addClip`, `deleteClip`, `uploadClipCover` |
+| `components/ui/ProfileCard.tsx` | Compact skater profile card with inline follow/unfollow button; used in search results and followers/following lists |
+| `components/ui/ClipCard.tsx` | Single clip display — cover image or platform placeholder, title, platform badge, "Open original" link; no embed logic |
+| `components/ui/AddClipForm.tsx` | Form to add a clip: URL (required), platform (auto-detected), title, caption, optional cover upload |
+| `app/profile/[username]/page.tsx` | Public profile page — privacy-gated, shows avatar/bio/follow button/clips grid |
+| `app/users/search/page.tsx` | Debounced user search across public profiles; renders `ProfileCard` results |
+
+#### Modified files
+
+| File | What changed |
+|------|-------------|
+| `lib/profilesService.ts` | Added `getProfileByUsername(username)` and `searchProfiles(query)` |
+| `app/profile/edit/page.tsx` | Replaced `avatar_url` and `banner_url` text inputs with real file upload buttons; validates type and size before uploading to Supabase Storage `avatars` bucket; saves returned public URL to profile row immediately |
+| `app/profile/friends/page.tsx` | Replaced "Coming Soon" placeholder with real Following/Followers tab UI backed by `getFollowing` and `getFollowers`; includes empty states and "Find skaters" link |
+| `app/profile/page.tsx` | Added follow counts row (Following / Followers / Find skaters links); added clips section with `AddClipForm` toggle and `ClipCard` grid with delete support |
+| `components/ui/UserBannerCard.tsx` | Added optional `followCounts?: FollowCounts` prop; renders follower/following counts below the stats row when provided |
+
+---
+
+### 13. Setup Required Before Testing
+
+The social features depend on database objects that do not exist until the SQL schema is applied. Before testing any social feature:
+
+1. Open Supabase Dashboard → SQL Editor.
+2. Run the full contents of `supabase/social-schema.sql`.
+3. This creates: `user_follows` table, `profile_clips` table, all 8 RLS policies, `avatars` Storage bucket, `clip-covers` Storage bucket, and all 8 Storage policies.
+4. Verify with:
+   ```sql
+   SELECT tablename, policyname, cmd
+   FROM pg_policies
+   WHERE tablename IN ('user_follows', 'profile_clips')
+   ORDER BY tablename, cmd;
+   ```
+
+---
+
+### 14. What to Build After This (Next Session)
+
+**Short term — test and harden:**
+1. Test avatar upload end-to-end: pick file, verify bucket path, verify profile row updated, verify new avatar renders.
+2. Test public profile: visit `/profile/[username]`, check that private profiles show "Profile not found".
+3. Test user search: search for username, display_name, and local_park.
+4. Test follow/unfollow: button state, count updates, following/followers tabs.
+5. Test add clip: paste TikTok URL, add cover, verify it appears on profile.
+6. Test delete clip.
+7. Test RLS: confirm clips from private profiles return no rows via anon key.
+
+**Medium term — polish:**
+- Add a link to user search from the map (possibly in the bottom dock or VisibleSpotsPanel).
+- Show clip count on `UserBannerCard` (requires counting `profile_clips` rows).
+- Add spot attribution on clips — clicking a clip's spot badge flies the map to that location.
+- Verify mobile layout on all new pages.
+
+**Longer term — social depth:**
+- Activity feed showing recent clip posts from followed users.
+- YouTube embed (iframes are straightforward; a simple `<iframe>` works for YouTube).
+- TikTok/Instagram: cover + "Open original" is the permanent plan — embeds require platform review.
+- Notifications for new followers.
+- Per-user follower/following public pages (so anyone can see who a skater follows, not just the logged-in user's own list).
+
+---
+
+## Session: Profile Polish — Embeds, Notifications, and Responsive Layout
+
+**Date:** June 13, 2026
+**Areas touched:** `ClipCard`, `BottomLeftWidget`, `notificationService.ts` (new), public profile page layout
+
+---
+
+### 1. Overview
+
+This session polished the social layer that was built in the previous session. Three distinct problems were fixed:
+
+1. **Clip cards were cover-image-only** — TikTok and Instagram clips now attempt a live iframe embed before falling back to the cover image or a platform placeholder.
+2. **No way to notice new followers without visiting the profile page** — A lightweight red notification dot now appears on the map's profile button when a new follower is detected.
+3. **Public profile layout was broken on mobile and looked like a stretched mobile card on desktop** — The profile page was rewritten with explicit mobile and desktop breakpoints, and the avatar was permanently separated from the banner.
+
+No database schema, RLS policies, auth logic, follow/unfollow logic, or map logic were changed.
+
+---
+
+### 2. TikTok and Instagram Embeds in ClipCard
+
+#### What changed
+
+`components/ui/ClipCard.tsx` was rewritten to add a `MediaSection` sub-component. `MediaSection` runs before reaching the cover-image fallback:
+
+```ts
+// Attempt TikTok embed
+if (clip.platform === "tiktok") {
+  const videoId = extractTikTokVideoId(clip.external_url);
+  // URL pattern: https://www.tiktok.com/@user/video/1234567890
+  // Extracts: "1234567890"
+  if (videoId && !embedError) {
+    return <iframe src={`https://www.tiktok.com/embed/v2/${videoId}`} ... />;
+  }
+}
+
+// Attempt Instagram embed
+if (clip.platform === "instagram") {
+  const shortcode = extractInstagramShortcode(clip.external_url);
+  // URL pattern: https://www.instagram.com/p/ABC123/
+  // Extracts: "ABC123"
+  if (shortcode && !embedError) {
+    return <iframe src={`https://www.instagram.com/p/${shortcode}/embed/`} ... />;
+  }
+}
+
+// If neither matched, fall through to cover image or placeholder
+```
+
+#### How the embed fallback chain works
+
+The card has three levels:
+
+| Level | Shown when |
+|-------|-----------|
+| **Iframe embed** | Platform is TikTok or Instagram AND a valid video ID / shortcode can be extracted from the URL AND the iframe has not fired `onError` |
+| **Cover image** | Embed is not attempted (wrong platform / bad URL) OR iframe failed — AND the clip has a `cover_image_url` |
+| **Platform placeholder** | No embed, no cover — shows a platform-colored block with text |
+
+Within the platform placeholder, an extra "Clip unavailable" message appears when the URL was a TikTok/Instagram link but no valid ID could be parsed (e.g. a profile URL instead of a post URL), or when the iframe fired an error event.
+
+#### What `onError` does and does not catch
+
+`<iframe onError={() => setEmbedError(true)}>` fires when the iframe itself fails to load — network error, CORS block, invalid URL. It does **not** fire when TikTok or Instagram loads successfully but shows an "unavailable" message inside the iframe (the iframe HTTP response is still 200 OK). This means:
+
+- A deleted public TikTok: may show TikTok's own "unavailable" screen inside the iframe
+- A private TikTok post: same
+- A network failure: triggers `onError`, shows fallback
+
+"Open original ↗" is always visible in the info row below the embed for this reason — it is the real escape hatch regardless of embed state.
+
+#### The `sandbox` attribute on iframes
+
+All embed iframes include:
+```html
+sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-top-navigation-by-user-activation"
+```
+
+`sandbox` limits what an embedded iframe can do. Without it, an iframe can access the parent page, run arbitrary JavaScript, redirect the whole tab, and read cookies. The attribute enables only the permissions the video player actually needs:
+
+- `allow-scripts` — the player's JavaScript runs
+- `allow-same-origin` — the iframe can read its own cookies (needed for auth inside the embed)
+- `allow-popups` — "Share" and external links inside the player work
+- `allow-forms` — comment / like forms inside the embed work
+- `allow-top-navigation-by-user-activation` — tapping a link in the embed can open a new page, but only when the user explicitly clicks (not from script)
+
+`allow-top-navigation` (without the `by-user-activation` suffix) is intentionally omitted — that would let the embed redirect the whole browser tab via JavaScript.
+
+#### YouTube and "other" platform clips
+
+Unchanged. YouTube clips show the cover image (or a red placeholder) and "Open original" link. No YouTube iframe embed is added here because YouTube's embed URL format (`/embed/VIDEO_ID`) requires extracting the video ID from several possible URL patterns (`/watch?v=`, `/shorts/`, `youtu.be/`) and the MVP value is limited — the TikTok/Instagram embeds are higher priority for a skate clip platform. YouTube embeds remain a noted future item.
+
+---
+
+### 3. New Follower Notification Badge
+
+#### The problem
+
+After the social layer was built, there was no way for a user to know they had a new follower without manually opening their profile page. The profile button on the map had no indicator.
+
+#### The solution: localStorage-based badge
+
+A new file `lib/notificationService.ts` was added with two functions:
+
+```ts
+// Read how many followers the user had last time they visited their profile
+getSeenFollowerCount(userId: string): number | null
+
+// Write the current follower count after the user visits their profile
+setSeenFollowerCount(userId: string, count: number): void
+```
+
+These store and read a single value in the browser's `localStorage`:
+- Key: `goskate_seen_followers_{userId}`
+- Value: an integer (the follower count at last profile visit)
+
+The flow across two components:
+
+**`app/profile/page.tsx`** (own profile page):
+After follower counts are fetched from Supabase, the current count is written to localStorage:
+```ts
+setSeenFollowerCount(p.id, counts.followers); // "I've now seen N followers"
+```
+
+**`components/ui/BottomLeftWidget.tsx`** (map controls):
+On mount, when the user is logged in, one `getFollowCounts` query runs. The result is compared to the stored value:
+```ts
+const seen = getSeenFollowerCount(user.id);
+if (seen === null) {
+  // First time ever — set baseline, no badge
+  setSeenFollowerCount(user.id, counts.followers);
+} else if (counts.followers > seen) {
+  setHasNewFollowers(true); // show red dot
+}
+```
+
+When the profile button is tapped, `setHasNewFollowers(false)` clears the badge immediately before navigating, so the badge disappears the moment the user acts on it. The badge will not reappear until the next map load detects another increase.
+
+#### Why localStorage instead of a database table
+
+A proper notification system requires a `notifications` table, RLS, insert triggers, and ideally real-time subscriptions. For an MVP badge indicating "someone new followed you," that infrastructure is premature. localStorage is:
+
+- Zero additional database queries beyond the one follower count fetch
+- Zero schema changes
+- Persistent across page reloads (unlike `useState`)
+- Per-device (the badge may not show on a second device if the user checked it on the first — acceptable for MVP)
+
+The tradeoff: if a user gains followers on device A and never visits their profile on device A, the badge on device B will also never appear until device A checks. This is a known limitation and acceptable for MVP.
+
+#### The red dot badge
+
+On both desktop (left toolbar) and mobile (bottom dock), the profile button is wrapped in a `relative` div. The badge is:
+```html
+<span class="absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-surface" />
+```
+
+`ring-2 ring-surface` adds a thin border matching the background color, creating a visual separation between the dot and the button icon. `pointer-events-none` prevents the dot from interfering with button clicks.
+
+---
+
+### 4. Public Profile Page — Responsive Layout Rewrite
+
+#### What was wrong
+
+The public profile page (`/profile/[username]`) had several layout issues:
+
+- **Mobile:** The avatar was using a negative top margin (`-mt-11`) to overlap the banner, but the amount of overlap was inconsistent across iterations and caused the username, follow button, and counts to start too close to the bottom of the banner, creating a cramped / overlapping appearance.
+- **Desktop:** The container was `max-w-lg` (512px) — the same narrow width used for mobile. On a 1280px desktop, this looked like a tiny centered card rather than a real profile page.
+- **Avatar "inside the banner":** After several layout attempts the negative margin was either too large (avatar deeply into banner) or removed (avatar flat below banner with no visual connection). The final decision was to fully separate the avatar from the banner.
+
+#### The final layout structure
+
+```
+[Full-width banner — h-36 mobile / md:h-52 desktop]
+  [Back button — absolute top-left]
+
+[Content container — max-w-xl mobile / md:max-w-3xl desktop, px-4 / md:px-8]
+  [mt-5 / md:mt-8 — clear space below banner]
+  [Row: Avatar (h-20 / md:h-28) | Follow button — items-center]
+  [Display name — text-xl / md:text-2xl]
+  [@handle — text-sm / md:text-base]
+  [Follow counts — text-sm / md:text-base]
+  [Stats pills — text-xs / md:text-sm]
+  [Bio — text-sm / md:text-base]
+  [Clips grid — grid-cols-1 / sm:grid-cols-2, gap-3 / md:gap-4]
+```
+
+#### Mobile vs desktop — what changes at each breakpoint
+
+| Property | Mobile (default) | Desktop (`md:` prefix, ≥768px) |
+|----------|-----------------|-------------------------------|
+| Banner height | `h-36` (144px) | `md:h-52` (208px) |
+| Container max-width | `max-w-xl` (576px) | `md:max-w-3xl` (768px) |
+| Container side padding | `px-4` (16px each) | `md:px-8` (32px each) |
+| Space below banner | `mt-5` (20px) | `md:mt-8` (32px) |
+| Avatar size | `h-20 w-20` (80px) | `md:h-28 md:w-28` (112px) |
+| Avatar/button gap after row | `mb-4` (16px) | `md:mb-5` (20px) |
+| Name font size | `text-xl` | `md:text-2xl` |
+| Body text font size | `text-sm` | `md:text-base` |
+| Clips grid gap | `gap-3` | `md:gap-4` |
+
+#### Why the avatar no longer overlaps the banner
+
+The "overlap" pattern (avatar straddles the banner bottom) is a well-known design pattern used by Twitter and Instagram. It is visually nice but requires precise negative margin math:
+
+- Avatar is `h-20` = 80px. To straddle the banner: `margin-top: -(80px / 2)` = `-40px` so half the avatar is in the banner.
+- On mobile, `-40px` on a `h-36` banner leaves only `96px` of visible banner above the avatar — fine on large phones, cramped on small ones.
+- The math changes when avatar size changes (`md:h-28` needs `md:-mt-14`), when banner height changes, and when the container padding shifts. All three were changing across breakpoints.
+
+The decision was made to remove the overlap entirely: the avatar sits cleanly below the banner with `mt-5` / `md:mt-8` of breathing room. The avatar is still large and prominent. The layout is predictable at every screen size and does not require maintaining a set of negative margin values that match the avatar/banner heights.
+
+#### How Tailwind responsive prefixes work
+
+Tailwind uses a mobile-first approach. A class without a prefix applies at all screen sizes. A prefixed class (`md:`, `lg:`, etc.) activates at that breakpoint and above, and overrides the unprefixed version:
+
+```html
+<div class="max-w-xl md:max-w-3xl px-4 md:px-8">
+```
+
+At screens narrower than 768px: `max-w-xl` and `px-4` apply.
+At 768px and wider: `md:max-w-3xl` overrides `max-w-xl`, and `md:px-8` overrides `px-4`.
+
+There is no "mobile only" prefix — to apply a style only on mobile, you use the unprefixed class and then override it at the next breakpoint. For example, a class that should only exist on mobile looks like:
+```html
+<p class="block md:hidden">Mobile only</p>
+```
+
+---
+
+### 5. Key Concepts This Session
+
+#### `iframe` embeds vs `<script>` embeds
+
+Social platforms offer two kinds of embed:
+
+- **Script-based** (TikTok's `<blockquote>` + `embed.js`, Instagram's `<blockquote>` + `embed.js`): The embed HTML is a stub; the platform's JavaScript replaces it at runtime with the real player. Works everywhere. Requires loading an external script, which can slow the page and has more cross-site concerns.
+
+- **Iframe-based** (`/embed/v2/VIDEO_ID`): The entire player lives at a platform URL inside a sandboxed frame. No external script. Cleaner to implement. Easier to sandbox. This is what GoSkate uses.
+
+GoSkate uses the iframe path for both TikTok and Instagram because it requires no `<script>` tags, allows `sandbox` attribute control, and keeps the player entirely contained.
+
+#### Why `localStorage` is different from `useState`
+
+| | `useState` | `localStorage` |
+|--|-----------|---------------|
+| Survives page refresh | No | Yes |
+| Shared across tabs | No (each tab's React tree is separate) | Yes (same origin) |
+| Shared across devices | No | No |
+| Persists after browser close | No | Yes (until cleared) |
+| Available during SSR | No | No (browser only) |
+
+For the notification badge, `useState` alone would reset on every page load. `localStorage` keeps the "last seen count" across page loads and browser restarts, which is exactly the behavior needed.
+
+#### Why `pointer-events-none` on the badge span
+
+An absolutely positioned element sits visually on top of elements beneath it. Without `pointer-events-none`, clicking near the badge would target the badge span, not the button behind it. `pointer-events-none` makes the span invisible to mouse and touch events — clicks pass through to the button underneath.
+
+#### What `items-center` vs `items-end` does in a flex row
+
+Both control vertical alignment of items inside a flex container:
+
+- `items-end`: all items align to the **bottom** of the row. Used in the previous profile layout so the follow button's bottom edge lined up with the avatar's bottom edge — a typical "profile header" appearance.
+- `items-center`: all items align to the **vertical center** of the row. Used in the current layout because the avatar and follow button are the same logical "level" — neither is meant to anchor at the bottom.
+
+When the avatar was overlapping the banner, `items-end` made sense: the follow button needed to sit at the banner boundary, not float in the middle. Once the overlap was removed, `items-center` produces a cleaner side-by-side appearance.
+
+---
+
+### 6. Files Changed This Session
+
+#### New files
+
+| File | Purpose |
+|------|---------|
+| `lib/notificationService.ts` | `getSeenFollowerCount` and `setSeenFollowerCount` — localStorage helpers for the new-follower badge; no database dependency |
+
+#### Modified files
+
+| File | What changed |
+|------|-------------|
+| `components/ui/ClipCard.tsx` | Rewrote to add `MediaSection` sub-component; TikTok iframe embed via `/embed/v2/{id}`; Instagram iframe embed via `/p/{shortcode}/embed/`; `onError` fallback to cover image or platform placeholder; "Clip unavailable" message for unparseable URLs |
+| `components/ui/BottomLeftWidget.tsx` | Added `useAuth`, `getFollowCounts`, `getSeenFollowerCount`, `setSeenFollowerCount` imports; added `hasNewFollowers` state and mount effect; added red dot badge to profile button on both desktop and mobile toolbars; `goToProfile()` helper clears badge before navigating |
+| `app/profile/page.tsx` | Added `setSeenFollowerCount` call after follower counts load — dismisses the map badge when user visits their own profile |
+| `app/profile/[username]/page.tsx` | Full layout rewrite: responsive container (`max-w-xl` → `md:max-w-3xl`), taller desktop banner (`md:h-52`), larger desktop avatar (`md:h-28`), avatar fully separated from banner (positive `mt-5 md:mt-8`), larger text on desktop, responsive clips grid gap |
+
+---
+
+### 7. What to Build After This
+
+**Short term — test these features:**
+1. Open a TikTok clip URL on a profile — verify the iframe loads the player.
+2. Open an Instagram clip URL — verify the iframe loads.
+3. Paste an invalid TikTok URL (e.g. a profile link, not a video) — verify "Clip unavailable" message appears.
+4. Gain a new follower (use a second test account), return to the map — verify the red dot appears on the profile button.
+5. Tap the profile button — verify the dot disappears.
+6. Visit the profile page — verify the dot does not return on next map load.
+7. View `/profile/[username]` on a wide desktop screen — verify the `max-w-3xl` container and larger banner/avatar.
+8. View same page on a 375px mobile — verify no horizontal overflow, avatar is fully below banner.
+
+**Medium term:**
+- YouTube iframe embed — extract video ID from `/watch?v=ID`, `/shorts/ID`, and `youtu.be/ID` URLs; render `https://www.youtube.com/embed/{id}`.
+- Real notification infrastructure: a `notifications` table with `type='new_follower'`, `actor_id`, `read_at`. The badge would query unread rows instead of comparing localStorage counts.
+- Per-user public followers/following pages at `/profile/[username]/followers` and `/profile/[username]/following`.
+
+---

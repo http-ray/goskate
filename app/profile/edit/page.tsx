@@ -1,23 +1,15 @@
 // ============================================================
 // Edit Profile — /profile/edit
 //
-// Loads the signed-in user's profile row from the Supabase
-// profiles table, lets them edit all editable fields, and
-// saves changes via updateProfile() in profilesService.
-//
-// Editable fields:
-//   avatar_url, banner_url, username, display_name,
-//   bio, local_park, stance, is_public
-//
-// Read-only stat:
-//   parks_visited_count  (auto-tracked, never set by the user)
-//
-// If the user is not signed in they are redirected to /profile.
+// Lets users edit all editable profile fields.
+// Avatar and banner are uploaded to Supabase Storage (avatars bucket).
+// Avatar path: {userId}/avatar.{ext}
+// Banner path: {userId}/banner.{ext}
 // ============================================================
 
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
@@ -28,6 +20,28 @@ import {
   type Profile,
   type ProfileUpdate,
 } from "@/lib/profilesService";
+import { supabase } from "@/lib/supabase";
+
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
+
+async function uploadProfileImage(
+  userId: string,
+  file: File,
+  slot: "avatar" | "banner"
+): Promise<string> {
+  const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+  const path = `${userId}/${slot}.${ext}`;
+
+  const { error } = await supabase.storage
+    .from("avatars")
+    .upload(path, file, { upsert: true });
+
+  if (error) throw new Error(`Upload failed: ${error.message}`);
+
+  const { data } = supabase.storage.from("avatars").getPublicUrl(path);
+  return data.publicUrl;
+}
 
 export default function EditProfilePage() {
   return (
@@ -46,6 +60,9 @@ function EditProfileContent() {
   const backHref = from === "settings" ? "/profile/settings" : "/profile";
   const backLabel = from === "settings" ? "Back to settings" : "Back to profile";
 
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const bannerInputRef = useRef<HTMLInputElement>(null);
+
   // ---- Profile loading state ----
   const [profile, setProfile] = useState<Profile | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -60,30 +77,22 @@ function EditProfileContent() {
   const [localPark, setLocalPark] = useState("");
   const [isPublic, setIsPublic] = useState(true);
 
+  // ---- Upload state ----
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+
   // ---- UI state ----
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Load the profile row when the auth user resolves
   useEffect(() => {
     if (authLoading) return;
-
-    if (!user) {
-      // Not signed in — redirect to login
-      router.replace("/profile");
-      return;
-    }
+    if (!user) { router.replace("/profile"); return; }
 
     getProfile(user.id)
       .then((loaded) => {
-        if (!loaded) {
-          // Profile row doesn't exist yet — go back so ensureProfile runs
-          router.replace("/profile");
-          return;
-        }
-
-        // Populate form state with existing values
+        if (!loaded) { router.replace("/profile"); return; }
         setProfile(loaded);
         setUsername(loaded.username ?? "");
         setDisplayName(loaded.display_name ?? "");
@@ -100,6 +109,62 @@ function EditProfileContent() {
       .finally(() => setProfileLoading(false));
   }, [authLoading, user, router]);
 
+  function validateImageFile(file: File): string | null {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      return "Only JPEG, PNG, or WebP images are allowed.";
+    }
+    if (file.size > MAX_IMAGE_BYTES) {
+      return "Image must be 5 MB or smaller.";
+    }
+    return null;
+  }
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const validationError = validateImageFile(file);
+    if (validationError) { setError(validationError); return; }
+
+    setError(null);
+    setUploadingAvatar(true);
+    try {
+      const url = await uploadProfileImage(user.id, file, "avatar");
+      setAvatarUrl(url);
+      // Persist immediately so the new avatar isn't lost if the user navigates away
+      await updateProfile(user.id, { avatar_url: url });
+      setMessage("Avatar updated!");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Avatar upload failed.");
+    } finally {
+      setUploadingAvatar(false);
+      // Reset file input so the same file can be re-selected if needed
+      if (avatarInputRef.current) avatarInputRef.current.value = "";
+    }
+  }
+
+  async function handleBannerChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const validationError = validateImageFile(file);
+    if (validationError) { setError(validationError); return; }
+
+    setError(null);
+    setUploadingBanner(true);
+    try {
+      const url = await uploadProfileImage(user.id, file, "banner");
+      setBannerUrl(url);
+      await updateProfile(user.id, { banner_url: url });
+      setMessage("Banner updated!");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Banner upload failed.");
+    } finally {
+      setUploadingBanner(false);
+      if (bannerInputRef.current) bannerInputRef.current.value = "";
+    }
+  }
+
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) return;
@@ -108,7 +173,6 @@ function EditProfileContent() {
     setMessage(null);
     setSaving(true);
 
-    // Build the update object — empty strings become null to keep the DB clean
     const updates: ProfileUpdate = {
       username: username.trim() || null,
       display_name: displayName.trim() || null,
@@ -125,15 +189,12 @@ function EditProfileContent() {
       setProfile(updated);
       setMessage("Profile saved!");
     } catch (saveError) {
-      setError(
-        saveError instanceof Error ? saveError.message : "Could not save profile."
-      );
+      setError(saveError instanceof Error ? saveError.message : "Could not save profile.");
     } finally {
       setSaving(false);
     }
   }
 
-  // ---- Loading state ----
   if (authLoading || profileLoading) {
     return (
       <div className="min-h-screen bg-black px-5 py-8 text-white">
@@ -144,7 +205,6 @@ function EditProfileContent() {
     );
   }
 
-  // Fallback — redirects are handled in useEffect
   if (!user || !profile) return null;
 
   return (
@@ -159,7 +219,6 @@ function EditProfileContent() {
 
         <h1 className="mb-6 text-2xl font-bold">Edit Profile</h1>
 
-        {/* ---- Parks visited — read-only stat ---- */}
         {profile.parks_visited_count > 0 && (
           <div className="mb-6 flex items-center gap-3 rounded-2xl border border-white/10 bg-zinc-900/70 px-4 py-3">
             <span className="text-lg" aria-hidden="true">📍</span>
@@ -173,7 +232,36 @@ function EditProfileContent() {
 
         <form onSubmit={handleSave} className="flex flex-col gap-5">
 
-          {/* ---- Avatar preview ---- */}
+          {/* ---- Banner upload ---- */}
+          <div className="flex flex-col gap-2">
+            <span className="text-xs text-zinc-500">Banner</span>
+            {bannerUrl ? (
+              <img
+                src={bannerUrl}
+                alt="Banner preview"
+                className="h-24 w-full rounded-2xl border border-white/10 object-cover"
+              />
+            ) : (
+              <div className="h-24 w-full rounded-2xl border border-white/10 bg-gradient-to-br from-zinc-800 to-zinc-900" />
+            )}
+            <input
+              ref={bannerInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleBannerChange}
+            />
+            <button
+              type="button"
+              disabled={uploadingBanner}
+              onClick={() => bannerInputRef.current?.click()}
+              className="rounded-2xl border border-white/10 bg-zinc-900 py-2 text-xs text-zinc-400 transition-colors hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {uploadingBanner ? "Uploading..." : "Upload Banner"}
+            </button>
+          </div>
+
+          {/* ---- Avatar upload ---- */}
           <div className="flex flex-col items-center gap-3">
             {avatarUrl ? (
               <img
@@ -186,24 +274,23 @@ function EditProfileContent() {
                 {(displayName || username)[0]?.toUpperCase() ?? "G"}
               </div>
             )}
-            <p className="text-xs text-zinc-500">
-              Enter an avatar URL below to update your photo
-            </p>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
+            <button
+              type="button"
+              disabled={uploadingAvatar}
+              onClick={() => avatarInputRef.current?.click()}
+              className="rounded-2xl border border-white/10 bg-zinc-900 px-4 py-2 text-xs text-zinc-400 transition-colors hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {uploadingAvatar ? "Uploading..." : "Upload Avatar"}
+            </button>
+            <p className="text-xs text-zinc-600">JPEG, PNG, or WebP · max 5 MB</p>
           </div>
-
-          {/* ---- Image URLs ---- */}
-          <Field
-            label="Avatar URL"
-            value={avatarUrl}
-            onChange={setAvatarUrl}
-            placeholder="https://example.com/avatar.jpg"
-          />
-          <Field
-            label="Banner URL"
-            value={bannerUrl}
-            onChange={setBannerUrl}
-            placeholder="https://example.com/banner.jpg"
-          />
 
           {/* ---- Identity ---- */}
           <Field
@@ -240,9 +327,7 @@ function EditProfileContent() {
             <span className="text-xs text-zinc-500">Stance</span>
             <select
               value={stance}
-              onChange={(e) =>
-                setStance(e.target.value as "regular" | "goofy" | "")
-              }
+              onChange={(e) => setStance(e.target.value as "regular" | "goofy" | "")}
               className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-zinc-500"
             >
               <option value="">Not set</option>
@@ -263,7 +348,6 @@ function EditProfileContent() {
                 When off, your profile is hidden from other users.
               </p>
             </div>
-            {/* Toggle pill */}
             <div
               role="switch"
               aria-checked={isPublic}
@@ -285,7 +369,6 @@ function EditProfileContent() {
               {error}
             </div>
           )}
-
           {message && (
             <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
               {message}
@@ -294,7 +377,7 @@ function EditProfileContent() {
 
           <button
             type="submit"
-            disabled={saving}
+            disabled={saving || uploadingAvatar || uploadingBanner}
             className="w-full rounded-2xl bg-white py-3 text-sm font-semibold text-black transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? "Saving..." : "Save Changes"}
@@ -305,9 +388,6 @@ function EditProfileContent() {
   );
 }
 
-// ============================================================
-// Reusable text / textarea field
-// ============================================================
 function Field({
   label,
   value,

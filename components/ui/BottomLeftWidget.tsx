@@ -16,9 +16,12 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AddSpotFlow from "@/components/ui/AddSpotFlow";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { getFollowCounts } from "@/lib/followsService";
+import { getSeenFollowerCount, setSeenFollowerCount } from "@/lib/notificationService";
 
 interface BottomLeftWidgetProps {
   mapCenter: { lat: number; lng: number };
@@ -32,7 +35,35 @@ export default function BottomLeftWidget({
   onMapMove,
 }: BottomLeftWidgetProps) {
   const router = useRouter();
+  const { user } = useAuth();
   const [showAddSpotModal, setShowAddSpotModal] = useState(false);
+  const [hasNewFollowers, setHasNewFollowers] = useState(false);
+
+  // Check for new followers once when the user is known.
+  // Compares live follower count against localStorage "last seen" count.
+  // On first use (no stored value) we just initialise the baseline — no badge.
+  useEffect(() => {
+    if (!user) {
+      setHasNewFollowers(false);
+      return;
+    }
+    getFollowCounts(user.id)
+      .then((counts) => {
+        const seen = getSeenFollowerCount(user.id);
+        if (seen === null) {
+          // First time — establish baseline, no badge
+          setSeenFollowerCount(user.id, counts.followers);
+        } else if (counts.followers > seen) {
+          setHasNewFollowers(true);
+        }
+      })
+      .catch(() => {});
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function goToProfile() {
+    setHasNewFollowers(false);
+    router.push("/profile");
+  }
 
   const handleLocateMe = () => {
     // Call the function exposed by MapView on `window`
@@ -60,27 +91,32 @@ export default function BottomLeftWidget({
 
       {/* Desktop: left floating toolbar */}
       <div className="fixed left-4 top-1/2 z-50 hidden -translate-y-1/2 flex-col gap-3 rounded-3xl border border-line bg-surface p-2 shadow-xl md:flex">
-        <button
-          onClick={() => router.push("/profile")}
-          aria-label="Profile"
-          className={controlButtonClass}
-        >
-          {/* User icon */}
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div className="relative">
+          <button
+            onClick={goToProfile}
+            aria-label="Profile"
+            className={controlButtonClass}
           >
-            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-            <circle cx="12" cy="7" r="4" />
-          </svg>
-        </button>
+            {/* User icon */}
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="22"
+              height="22"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+              <circle cx="12" cy="7" r="4" />
+            </svg>
+          </button>
+          {hasNewFollowers && (
+            <span className="pointer-events-none absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-surface" />
+          )}
+        </div>
 
         <button
           onClick={handleAddSpot}
@@ -189,27 +225,32 @@ export default function BottomLeftWidget({
       {/* Mobile: floating bottom dock with thumb-friendly controls */}
       <div className="fixed inset-x-4 bottom-4 z-50 md:hidden">
         <div className="grid grid-cols-3 items-end rounded-3xl border border-line bg-surface px-4 pb-3 pt-2 shadow-xl">
-          <button
-            onClick={() => router.push("/profile")}
-            aria-label="Profile"
-            className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-elevated text-ink shadow-md transition-colors hover:bg-line/40 active:scale-95"
-          >
-            {/* User icon */}
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="22"
-              height="22"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+          <div className="relative mx-auto">
+            <button
+              onClick={goToProfile}
+              aria-label="Profile"
+              className="flex h-12 w-12 items-center justify-center rounded-full bg-elevated text-ink shadow-md transition-colors hover:bg-line/40 active:scale-95"
             >
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-              <circle cx="12" cy="7" r="4" />
-            </svg>
-          </button>
+              {/* User icon */}
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+              </svg>
+            </button>
+            {hasNewFollowers && (
+              <span className="pointer-events-none absolute right-0.5 top-0.5 h-2.5 w-2.5 rounded-full bg-red-500 ring-2 ring-surface" />
+            )}
+          </div>
 
           <button
             onClick={handleAddSpot}

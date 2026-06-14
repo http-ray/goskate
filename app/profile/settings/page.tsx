@@ -43,10 +43,10 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-base text-ink px-5 py-8 font-sans max-w-lg mx-auto">
       {/* ---- Back ---- */}
       <Link
-        href="/profile"
+        href="/"
         className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink mb-6"
       >
-        ← Back to profile
+        ← Back to map
       </Link>
 
       <h1 className="text-2xl font-bold mb-6">Settings</h1>

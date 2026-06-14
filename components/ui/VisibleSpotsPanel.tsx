@@ -28,23 +28,26 @@
 import { useState, useMemo } from "react";
 import { Spot } from "@/types/spot";
 
+export type FilterType = "all" | "skatepark" | "street";
+
 interface VisibleSpotsPanelProps {
   spots: Spot[];
+  activeFilter: FilterType;
+  onFilterChange: (filter: FilterType) => void;
   onSpotClick: (spot: Spot) => void;
 }
 
-type FilterType = "all" | "official" | "user" | "skatepark" | "street";
-
 export default function VisibleSpotsPanel({
   spots,
+  activeFilter,
+  onFilterChange,
   onSpotClick,
 }: VisibleSpotsPanelProps) {
   // Controls whether the mobile bottom sheet is open or collapsed.
   const [isOpen, setIsOpen] = useState(false);
 
-  // Search and filter state
+  // Search state — filter chip state is owned by MapView so the map can react to it
   const [searchText, setSearchText] = useState("");
-  const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
   // Collapsible area sections. Every city/area starts COLLAPSED — only the
   // keys listed here are expanded. While searching we force-expand matching
@@ -60,36 +63,21 @@ export default function VisibleSpotsPanel({
 
   const count = spots.length;
 
-  // ---- Filter and search logic ----
+  // ---- Search logic ----
+  // Chip-filter is applied upstream (MapView) so `spots` already matches the
+  // active filter. Here we only apply the search text on top of that.
   const filteredSpots = useMemo(() => {
-    let filtered = spots;
-
-    // Apply filter
-    if (activeFilter === "official") {
-      filtered = filtered.filter((s) => s.source === "official");
-    } else if (activeFilter === "user") {
-      filtered = filtered.filter((s) => s.source === "user");
-    } else if (activeFilter === "skatepark") {
-      filtered = filtered.filter((s) => s.type === "skatepark");
-    } else if (activeFilter === "street") {
-      filtered = filtered.filter((s) => s.type === "street");
-    }
-
-    // Apply search text
-    if (searchText.trim()) {
-      const query = searchText.toLowerCase().trim();
-      filtered = filtered.filter((s) => {
-        const matchName = s.name.toLowerCase().includes(query);
-        const matchArea = s.areaText?.toLowerCase().includes(query);
-        const matchType = s.type.toLowerCase().includes(query);
-        const matchSource = s.source.toLowerCase().includes(query);
-
-        return matchName || matchArea || matchType || matchSource;
-      });
-    }
-
-    return filtered;
-  }, [spots, activeFilter, searchText]);
+    if (!searchText.trim()) return spots;
+    const query = searchText.toLowerCase().trim();
+    return spots.filter((s) => {
+      return (
+        s.name.toLowerCase().includes(query) ||
+        s.areaText?.toLowerCase().includes(query) ||
+        s.type.toLowerCase().includes(query) ||
+        s.source.toLowerCase().includes(query)
+      );
+    });
+  }, [spots, searchText]);
 
   // ---- Group by area ----
   const groupedSpots = useMemo(() => {
@@ -172,7 +160,11 @@ export default function VisibleSpotsPanel({
                     : "bg-warning/15 text-warning"
                 }`}
               >
-                {isOfficial ? "Official" : "User"}
+                {isOfficial
+                  ? "Official"
+                  : spot.submitterUsername
+                  ? `User: @${spot.submitterUsername}`
+                  : "User"}
               </span>
 
               {/* Clips count — only shown when the spot has clips */}
@@ -205,20 +197,25 @@ export default function VisibleSpotsPanel({
   }
 
   // ---- Shared empty-state message ----
-  const emptyMessage =
-    count === 0 ? (
-      <p className="px-4 py-8 text-center text-sm text-faint">
-        No spots visible here.
-        <br />
-        Pan or zoom out to find more.
-      </p>
-    ) : (
-      <p className="px-4 py-8 text-center text-sm text-faint">
-        No spots match your search.
-        <br />
-        Try different keywords or filters.
-      </p>
-    );
+  const emptyMessage = searchText.trim() ? (
+    <p className="px-4 py-8 text-center text-sm text-faint">
+      No spots match your search.
+      <br />
+      Try different keywords or filters.
+    </p>
+  ) : activeFilter !== "all" ? (
+    <p className="px-4 py-8 text-center text-sm text-faint">
+      No {activeFilter} spots in view.
+      <br />
+      Pan or zoom out, or try a different filter.
+    </p>
+  ) : (
+    <p className="px-4 py-8 text-center text-sm text-faint">
+      No spots visible here.
+      <br />
+      Pan or zoom out to find more.
+    </p>
+  );
 
   // ---- Filter chip component ----
   function FilterChip({
@@ -233,7 +230,7 @@ export default function VisibleSpotsPanel({
     const isActive = activeFilter === filter;
     return (
       <button
-        onClick={() => setActiveFilter(filter)}
+        onClick={() => onFilterChange(filter)}
         className={isActive ? "gs-chip-active" : "gs-chip"}
       >
         {label}
@@ -298,8 +295,6 @@ export default function VisibleSpotsPanel({
         {/* Filter chips */}
         <div className="flex flex-wrap gap-2">
           <FilterChip label="All" filter="all" />
-          <FilterChip label="Official" filter="official" />
-          <FilterChip label="User" filter="user" />
           <FilterChip label="Skateparks" filter="skatepark" />
           <FilterChip label="Street" filter="street" />
         </div>

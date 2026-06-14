@@ -643,3 +643,349 @@ Result:
 5. Deploy to Vercel.
 
 ---
+
+## Session: Map UI Polish, Heatmap, Markers, Filter Sync, and MVP Readiness
+
+**Date:** June 13, 2026
+**Areas touched:** MapView, SpotMarker, SpotHeatLayer, VisibleSpotsPanel, spotsService, Spot type, settings page, development log
+
+---
+
+### 1. Session Overview
+
+This session was primarily about visual polish and making the map feel like a real product before deployment. Several problems that had been acceptable during development were no longer acceptable for a public MVP:
+
+- The map tiles were dark and hard to read as a *location* tool.
+- Spot markers were small colored dots — not distinctive enough.
+- The heatmap existed but was too subtle and washed out.
+- Selecting a filter in the Spots in View panel changed the list but left the map completely unchanged — markers and heatmap still showed everything.
+- User-submitted spots showed a plain "User" badge with no attribution.
+- The Settings back button went to the profile page instead of the map.
+
+Each of these was fixed. The section below explains what changed and why.
+
+---
+
+### 2. Map Tiles: Switching to OpenStreetMap Light
+
+**What changed:** The map tile layer was switched from dark CARTO tiles to the standard OpenStreetMap light tile style.
+
+**Why this matters:**
+
+Tile layers are the background image of a map. They determine what the map *looks* like at rest — roads, labels, parks, buildings.
+
+Dark tiles look great for data dashboards and nighttime navigation apps. For GoSkate, the goal is the opposite: help skaters *find a location* — an intersection, a plaza, a park entrance. Light tiles with clear road labels and landmark names are much easier to read for this purpose.
+
+There's also a practical reason: when markers, heatmap colors, and UI widgets are dark-themed and so is the base map, everything blends together. A light tile layer creates contrast — dark UI elements read clearly against a light background, and the heatmap colors pop instead of disappearing.
+
+The switch was one line change in `MapView.tsx`:
+
+```tsx
+// Before: CARTO dark tiles
+url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+
+// After: OpenStreetMap standard light tiles
+url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+```
+
+---
+
+### 3. UI Color Direction
+
+**What changed:** The color system was clarified to serve specific semantic purposes rather than being decorative.
+
+| Color | Role |
+|---|---|
+| Cream / off-white | Map widgets, panel backgrounds, UI accents |
+| Green | Semantic only — Official/Approved badges and status dots |
+| Red + Black | Skate-inspired — spot markers, visual branding |
+
+**Why this matters:**
+
+Before this change, green was used for both marker dots *and* official badges. That made it hard to quickly distinguish "this spot is official" from "this is a spot." Once green became semantic-only (meaning only when something is verified or approved), the visual language became clearer. A user glancing at the panel can immediately tell a green dot means "official" without reading the label.
+
+---
+
+### 4. Spot Markers: From Colored Dots to Skateboard Icons
+
+**What changed:** Individual spot markers were replaced with a custom skateboard icon (`public/images/skateicon.png`).
+
+**Why this matters:**
+
+Colored circle dots are the Leaflet default. They work, but they carry no brand identity. On a busy OSM light tile map with road labels, circles can be hard to pick out at a glance.
+
+A skateboard icon makes the spots immediately recognizable as skate-related, creates a consistent visual identity, and stands out against the map tiles without requiring bright neon colors.
+
+The marker implementation uses Leaflet's `DivIcon` with an `<img>` tag:
+
+```tsx
+html: `
+  <div style="display:flex;align-items:center;justify-content:center;
+    width:${wrapper}px;height:${wrapper}px;cursor:pointer;">
+    <img src="/images/skateicon.png" alt="" style="
+      width:${iconSize}px;height:${iconSize}px;object-fit:contain;
+      filter:drop-shadow(0 1px 3px rgba(0,0,0,0.45));" />
+  </div>
+`
+```
+
+Official spots render at 48px; user-submitted spots at 44px. The outer wrapper is 56px so the tap target stays easy to hit on mobile. The `drop-shadow` CSS filter adds depth against the light tile background without a colored ring.
+
+**Size iterations:** The marker went through several size passes (32px → 40px → 48px). The lesson: on a real device at real map zoom levels, what looks big in a browser window can still be small. Test on mobile hardware.
+
+---
+
+### 5. Heatmap Density Layer
+
+**What changed:** A `leaflet.heat`-based density heatmap was added as a high-level skate spot discovery tool.
+
+**What it does:**
+
+The heatmap is a blurred color overlay that shows where spots *cluster* at regional zoom levels. It is not meant to show exact locations — that's what individual markers are for. Think of the heatmap as an answer to "where are the skateboarding scenes in this state?" before you zoom in to find specific parks.
+
+**Zoom-based behavior:**
+
+| Zoom level | Heatmap | Markers |
+|---|---|---|
+| ≤ 5 (US-wide) | Full opacity | Clustered/hidden |
+| 6–8 (state/city) | Fading out | Gradually appearing |
+| 9 | Very faint | Primary interaction layer |
+| ≥ 10 (neighborhood) | Hidden | Fully visible |
+
+This transition is deliberate: the two layers serve different purposes, and showing both at the same time creates visual noise. As you zoom in, the heatmap gracefully gives way to the exact markers.
+
+**How opacity transition works:**
+
+`leaflet.heat` renders to a single `<canvas>` element in Leaflet's `overlayPane` (which sits *below* the `markerPane`). Setting `canvas.style.opacity` on `zoomend` is a lightweight way to fade the whole heatmap layer. No new canvas is created; no data is reprocessed — just a single CSS property update.
+
+```ts
+const applyZoomOpacity = () => {
+  const canvas = (heat as unknown as { _canvas?: HTMLCanvasElement })._canvas;
+  if (canvas) {
+    canvas.style.opacity = String(heatOpacityForZoom(map.getZoom()));
+    canvas.style.transition = "opacity 0.2s ease";
+  }
+};
+```
+
+Because the heatmap canvas is *below* the marker pane, it never intercepts clicks. Marker popups and check-in buttons work at all zoom levels.
+
+**Gradient:** A standard cool→warm gradient was used (blue → teal → yellow → orange → red). Alpha values were tuned specifically for a white/light tile background — colors that look soft on dark tiles look washed out on light tiles, so alphas needed to be higher.
+
+**Cluster settings:** `disableClusteringAtZoom={8}` means individual markers appear at zoom 8 and below. `maxClusterRadius={30}` means only markers within 30px on screen cluster together — so closely-grouped parks separate into individual markers sooner than the default.
+
+---
+
+### 6. Filter Sync: Map Visuals Now Match Active Filters
+
+**What changed:** The active filter chip now affects map markers *and* the heatmap, not just the Spots in View panel list.
+
+**The problem before:**
+
+The filter state (`activeFilter`) lived entirely inside `VisibleSpotsPanel`. When you selected "Street," the panel list changed, but `MapView` had no idea — it kept showing all spot markers and the full heatmap.
+
+This was a data isolation problem. The component that *displayed* the filter result (the panel) owned the filter state, but the components that *needed to respond* to it (markers, heatmap) were siblings in a different part of the tree with no access.
+
+**The fix: lift state to the shared parent**
+
+`activeFilter` was moved up to `MapView.tsx`, which is the shared parent of the panel, the markers, and the heatmap. This is a standard React pattern called *lifting state up*.
+
+```
+MapView (owns activeFilter)
+  ├── SpotHeatLayer          ← receives filteredPublicSpots
+  ├── MarkerClusterGroup
+  │     └── SpotMarker[]     ← rendered from filteredPublicSpots
+  └── VisibleSpotsPanel      ← receives filteredVisibleSpots + activeFilter + onFilterChange
+```
+
+Two derived arrays are computed in `MapView` using `useMemo`:
+
+```ts
+// All spots matching the filter — used for markers and heatmap
+const filteredPublicSpots = useMemo(
+  () => applyFilter(publicSpots, activeFilter),
+  [publicSpots, activeFilter]
+);
+
+// Only the viewport-visible spots matching the filter — used for the panel
+const filteredVisibleSpots = useMemo(
+  () => applyFilter(visibleSpots, activeFilter),
+  [visibleSpots, activeFilter]
+);
+```
+
+The panel still owns `searchText` internally (it only affects the list display, not the map).
+
+**FilterType was simplified:**
+
+`"official"` and `"user"` filter options were removed entirely. Source-based filtering was not a useful discovery mechanic from the map perspective — skaters don't think "show me only user-submitted spots." The remaining options are `"all"`, `"skatepark"`, and `"street"`, which map to real-world how skaters navigate.
+
+---
+
+### 7. User Attribution on Spot Badges
+
+**What changed:** The "User" badge on user-submitted spots in the panel now shows `User: @username` when the submitter has a public profile.
+
+**Why this matters:**
+
+Plain "User" is anonymous. Showing `@username` gives credit to the skater who found and submitted the spot. It also makes the panel more social — you can see who's been adding spots in your city.
+
+**How it works:**
+
+The `Spot` type was extended with `submitterUsername?: string`. The `fetchPublicSpots` function now:
+
+1. Fetches spots including the `created_by` UUID column.
+2. Collects unique `created_by` IDs for user-submitted spots only.
+3. Does one batch `profiles.select("id, username").in("id", [...])` call.
+4. Maps the result onto each spot's `submitterUsername` field.
+
+This is two queries total regardless of how many user spots exist — no N+1 problem.
+
+**Privacy:** The profiles table RLS only returns rows where `is_public = true` via the anon key. If a submitter has a private profile, no username is returned and the badge falls back to plain `"User"`. This is the correct behavior — private profiles should not have their username exposed.
+
+---
+
+### 8. Collapsible City/Area Sections in Spots Panel
+
+**What changed:** City/area group headers in the Spots in View panel are now *collapsed by default*, and expand individually when tapped.
+
+**Why this matters:**
+
+Before this change, every area group was expanded all the time. In a dense metro area with 30+ spots across 10 neighborhoods, the list was overwhelming to scroll through.
+
+Collapsing by default keeps the panel compact and scannable — you see the city/area headers and their spot counts without needing to read every spot name. Tap to expand only the neighborhood you care about.
+
+**Special case:** When the user types in the search box, all groups auto-expand so matching results are visible even in collapsed sections. This prevents the confusing situation where a search returns "3 spots" but none are visible because all sections are still collapsed.
+
+The collapse state is tracked as a `Set<string>` of *expanded* area keys:
+
+```ts
+// Empty set = all collapsed (correct default)
+const [expandedAreas, setExpandedAreas] = useState<Set<string>>(new Set());
+const isExpanded = isSearching || expandedAreas.has(groupKey);
+```
+
+---
+
+### 9. Settings Page: Back Link to Map
+
+**What changed:** The back link on the Settings page was changed from "← Back to profile" (which navigated to `/profile`) to "← Back to map" (navigating to `/`).
+
+**Why this matters:**
+
+Users most commonly reach Settings from the map's bottom-left widget, not from the profile page. The previous back destination created a two-tap path to return to the map. The new destination gets users back to their primary interaction surface immediately.
+
+This is a small change with a meaningful impact on navigation feel, especially on mobile where every tap counts.
+
+---
+
+### 10. Security and Deployment Readiness Review
+
+A full review was completed against the GoSkate codebase before deployment. The major findings:
+
+**Clean:**
+- No `NEXT_PUBLIC_` service role key exposure anywhere.
+- No Google Places API calls in frontend code — scripts only.
+- Admin moderation backed by RLS at the database layer (`profiles.is_admin = true`).
+- `WITH CHECK` on profile UPDATE prevents users from self-elevating `is_admin`.
+- Public spot reads restricted to `status = 'approved'` at DB level.
+- User INSERT enforces `status = 'pending'`, `source = 'user'`, `created_by = auth.uid()`.
+
+**Deployment steps remaining:**
+1. Finish map UI polish and verify marker/heatmap/filter behavior on device.
+2. Add and verify loading, error, and empty states on critical pages.
+3. Run `npm run lint` — fix any warnings.
+4. Run `npm run build` — confirm clean build output.
+5. Add production domain to Supabase Auth → URL Configuration → Site URL and Redirect URLs.
+6. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in Vercel environment.
+7. Deploy to Vercel.
+8. Test deployed app: auth login/logout, map load, Add Spot submission, admin review and approval.
+
+---
+
+### 11. Planned Future Work: Social and Profile Features
+
+The following features are planned for after MVP deployment. They are **not** in the current codebase.
+
+**Profiles:**
+- Avatar upload from device using Supabase Storage.
+- Public profile pages accessible by username URL (e.g. `/u/rayshun`).
+- User search to find other skaters.
+
+**Social:**
+- Following / followers system.
+- Activity feed showing recent spot additions and check-ins by followed users.
+
+**Clips:**
+- Profile clips linked from external platforms: TikTok, Instagram, YouTube.
+- Optional cover image upload (static thumbnail) per clip using Supabase Storage.
+- No native video uploads — hosting and streaming video is expensive and complex. External links give the social experience without the infrastructure cost.
+- No TikTok or Instagram OAuth account connection — users paste the link manually.
+
+**Why external links instead of native uploads:**
+
+Hosting video requires: storage (expensive per GB), CDN (expensive per egress), a video processing pipeline (transcode, thumbnail generation), and player logic. A link to a TikTok video costs zero infrastructure and the video is already mobile-optimized with captions and social engagement. For an MVP social layer, this is the correct tradeoff.
+
+---
+
+### 12. Concepts Learned (Beginner-Friendly)
+
+#### Why light map tiles improve readability
+
+A map tile is a pre-rendered image served from a tile server. Dark tiles reduce glare in navigation apps and look dramatic in data dashboards. For GoSkate — where the goal is "find this specific plaza downtown" — light tiles with legible road labels and building outlines help users orient themselves faster. The contrast also makes markers and UI panels easier to read.
+
+#### Heatmap density vs individual marker interaction
+
+A heatmap answers a regional question: "where are the scenes?" Individual markers answer a specific question: "what is this spot, how do I get there, who added it?"
+
+Trying to answer both questions with the same visual element (markers) doesn't scale. At US-wide zoom, 800 individual skateboard icons are unreadable noise. At street-level zoom, a blurry heatmap blob adds nothing. Using each tool at the right zoom level makes both more useful.
+
+#### Why `area_text` was safer than a new schema column
+
+Adding a new database column requires: a SQL migration, testing that existing data doesn't break, verifying the app handles null gracefully for rows that predate the column, and updating any queries that reference the table. For MVP, that's risk without benefit when `area_text` already exists, is already populated by the backfill script, and is already read by the panel grouping logic. Reuse what works.
+
+#### Why map filters should affect both the list and the map
+
+A filter creates a contract with the user: "I want to see only X." If the list shows only X but the map still shows everything, the user has to mentally reconcile two different states. That cognitive overhead is friction. When the list and the map always agree, the filter feels reliable and the app feels coherent.
+
+#### Why RLS matters before deployment
+
+RLS (Row Level Security) is Postgres's built-in access control system. Without it, any API call using the anon key can read, write, or delete any row — regardless of what the frontend code tries to enforce. Frontend access checks can be bypassed by anyone who opens DevTools or sends a direct API request. RLS enforces the same rules at the database layer where they cannot be bypassed. For GoSkate, this means a non-admin user cannot approve their own pending spot submission even if they send the API request directly.
+
+#### Why external video links are cheaper than native uploads
+
+Storing, transcoding, and streaming video is expensive. A 10-second clip might be 8MB. A platform with 1,000 users and 5 clips each is 40GB of storage, plus CDN egress every time anyone watches. External links (TikTok, YouTube) cost zero to host. The tradeoff is that you don't own the content — but for an MVP social layer, that's the right call.
+
+---
+
+### 13. Files Changed This Session
+
+| File | What changed |
+|---|---|
+| `components/map/MapView.tsx` | Switched to OSM light tiles; added `activeFilter` state; added `filteredPublicSpots` + `filteredVisibleSpots` memos; feeds filtered arrays to heatmap, markers, and panel; added `useMemo` import |
+| `components/map/SpotMarker.tsx` | Replaced colored circle `DivIcon` with skateboard icon (`skateicon.png`); tuned icon sizes (official 48px / user 44px) and wrapper tap target (56px) |
+| `components/map/SpotHeatLayer.tsx` | New file — `leaflet.heat` density heatmap; zoom-based opacity fade via CSS on heat canvas; cool→warm gradient tuned for white tile map |
+| `types/leaflet-heat.d.ts` | New file — TypeScript shim augmenting `"leaflet"` module with `L.heatLayer` and `L.HeatLayer` types |
+| `components/ui/VisibleSpotsPanel.tsx` | Exported `FilterType`; added `activeFilter` + `onFilterChange` props (filter state lifted to MapView); filter chip logic now calls `onFilterChange`; city/area sections collapsed by default; auto-expand when searching; updated empty state messages; source badge shows `User: @username` |
+| `lib/spotsService.ts` | `fetchPublicSpots` now selects `created_by`; batch-fetches profile usernames for user spots; maps `submitterUsername` onto returned `Spot` objects |
+| `types/spot.ts` | Added `submitterUsername?: string` field to `Spot` type |
+| `app/profile/settings/page.tsx` | Back link changed from `href="/profile"` / "Back to profile" to `href="/"` / "Back to map" |
+| `package.json` | Added `leaflet.heat: ^0.2.0` |
+
+---
+
+### 14. Next Steps
+
+1. Verify marker/heatmap/filter behavior visually on device (desktop + mobile).
+2. Confirm the mobile pill count updates correctly when filters change.
+3. Add loading and error states to any pages still missing them.
+4. Confirm RLS and admin review still work correctly end-to-end.
+5. Run `npm run lint` — fix any warnings.
+6. Run `npm run build` — confirm clean output.
+7. Add GoSkate production URL to Supabase Auth redirect settings.
+8. Set environment variables in Vercel dashboard.
+9. Deploy MVP.
+10. Test deployed auth, map, Add Spot, admin review, and spot approval on the live URL.
+11. After deployment, begin planning the social/profile feature set.
+
+---

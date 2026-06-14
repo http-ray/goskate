@@ -16,7 +16,7 @@
 
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -27,7 +27,7 @@ import { Spot } from "@/types/spot";
 import SpotMarker from "./SpotMarker";
 import SpotHeatLayer from "./SpotHeatLayer";
 import AddClipModal from "@/components/ui/AddClipModal";
-import VisibleSpotsPanel from "@/components/ui/VisibleSpotsPanel";
+import VisibleSpotsPanel, { FilterType } from "@/components/ui/VisibleSpotsPanel";
 import BottomLeftWidget from "@/components/ui/BottomLeftWidget";
 import { fetchPublicSpots } from "@/lib/spotsService";
 
@@ -120,6 +120,9 @@ export default function MapView() {
   }, []);
 
 
+  // ---- Active filter (lifted from VisibleSpotsPanel so map visuals match) ----
+  const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+
   // ---- Check-in state ----
   // A Set of spot IDs the user has checked into (frontend-only).
   const [checkedInSpots, setCheckedInSpots] = useState<Set<string>>(new Set());
@@ -140,6 +143,28 @@ export default function MapView() {
   // Tracks which spots fall inside the current map viewport.
   // Updated whenever the user pans or zooms via the moveend/zoomend effect below.
   const [visibleSpots, setVisibleSpots] = useState<Spot[]>([]);
+
+  // ---- Filter helpers ----
+  // Apply the active chip filter to any spot array. Runs in O(n) and is
+  // memoised so markers, heatmap, and the panel all read the same filtered
+  // arrays without redundant work.
+  function applyFilter(spots: Spot[], filter: FilterType): Spot[] {
+    if (filter === "skatepark") return spots.filter((s) => s.type === "skatepark");
+    if (filter === "street") return spots.filter((s) => s.type === "street");
+    return spots;
+  }
+
+  // All spots matching the filter — fed to markers and heatmap.
+  const filteredPublicSpots = useMemo(
+    () => applyFilter(publicSpots, activeFilter),
+    [publicSpots, activeFilter]
+  );
+
+  // Viewport-bounded spots matching the filter — fed to the panel.
+  const filteredVisibleSpots = useMemo(
+    () => applyFilter(visibleSpots, activeFilter),
+    [visibleSpots, activeFilter]
+  );
 
   // ---- Add Clip modal state ----
   const [clipSpot, setClipSpot] = useState<Spot | null>(null);
@@ -318,7 +343,7 @@ export default function MapView() {
         {/* --- Subtle density heatmap (sits below markers) ---
              Lives in the overlayPane beneath the markerPane, so it never
              intercepts marker/cluster clicks or popups. */}
-        <SpotHeatLayer spots={publicSpots} />
+        <SpotHeatLayer spots={filteredPublicSpots} />
 
         {/* --- Markers grouped into clusters when zoomed out ---
              react-leaflet-cluster wraps children using react-leaflet v5's
@@ -331,9 +356,14 @@ export default function MapView() {
           spiderfyOnMaxZoom
           showCoverageOnHover={false}
           zoomToBoundsOnClick
-          maxClusterRadius={60}
+          // Tight radius → only spots that truly overlap merge, so parks that
+          // are merely close still separate into individual markers early.
+          maxClusterRadius={30}
+          // Hard cutoff: at neighborhood zoom (8) and closer, clustering is
+          // fully off so every skate spot shows as its own marker.
+          disableClusteringAtZoom={8}
         >
-          {publicSpots.map((spot) => (
+          {filteredPublicSpots.map((spot) => (
             <SpotMarker
               key={spot.id}
               spot={spot}
@@ -368,7 +398,12 @@ export default function MapView() {
       {/* --- Visible spots panel ---
            Mobile: collapsed pill above the bottom dock, expands to sheet.
            Desktop: right-side floating panel, always visible. */}
-      <VisibleSpotsPanel spots={visibleSpots} onSpotClick={handleFlyToSpot} />
+      <VisibleSpotsPanel
+        spots={filteredVisibleSpots}
+        activeFilter={activeFilter}
+        onFilterChange={setActiveFilter}
+        onSpotClick={handleFlyToSpot}
+      />
 
       {/* --- Bottom controls (Add Spot, Profile, Settings, Locate Me) --- */}
       <BottomLeftWidget

@@ -29,18 +29,17 @@ import type { Spot, SupabaseSpotRow, SpotSubmission } from "@/types/spot";
  * Coordinates are included for map markers and directions
  * but should never be displayed as text in the UI.
  */
+type SpotRow = Pick<
+  SupabaseSpotRow,
+  "id" | "display_name" | "latitude" | "longitude" | "type" | "source" | "created_by"
+> & { area_text?: string | null };
+
 export async function fetchPublicSpots(): Promise<Spot[]> {
-  const baseSelect = "id, display_name, latitude, longitude, type, source";
+  const baseSelect = "id, display_name, latitude, longitude, type, source, created_by";
 
   // Try to include area_text for grouped visible-spot sections.
   // If the column is unavailable in an older DB schema, we retry safely.
-  let data: Array<
-    Pick<
-      SupabaseSpotRow,
-      "id" | "display_name" | "latitude" | "longitude" | "type" | "source"
-    > & { area_text?: string | null }
-  > | null = null;
-
+  let data: SpotRow[] | null = null;
   let error: { message: string } | null = null;
 
   const withArea = await supabase
@@ -55,30 +54,18 @@ export async function fetchPublicSpots(): Promise<Spot[]> {
       (message.includes("column") || message.includes("does not exist"));
 
     if (missingAreaColumn) {
-      // Fallback: base fields only.
       const baseFallback = await supabase
         .from("spots")
         .select(baseSelect)
         .eq("status", "approved");
 
-      data = baseFallback.data as Array<
-        Pick<
-          SupabaseSpotRow,
-          "id" | "display_name" | "latitude" | "longitude" | "type" | "source"
-        > & { area_text?: string | null }
-      >;
-
+      data = baseFallback.data as SpotRow[];
       error = baseFallback.error ? { message: baseFallback.error.message } : null;
     } else {
       error = { message: withArea.error.message };
     }
   } else {
-    data = withArea.data as Array<
-      Pick<
-        SupabaseSpotRow,
-        "id" | "display_name" | "latitude" | "longitude" | "type" | "source"
-      > & { area_text?: string | null }
-    >;
+    data = withArea.data as SpotRow[];
   }
 
   if (error) {
@@ -86,21 +73,44 @@ export async function fetchPublicSpots(): Promise<Spot[]> {
     throw new Error(`Supabase error: ${error.message}`);
   }
 
-  // Convert Supabase rows to the frontend Spot type
-  return (data || []).map(
-    (row: Pick<SupabaseSpotRow, "id" | "display_name" | "latitude" | "longitude" | "type" | "source"> & {
-      area_text?: string | null;
-    }): Spot => ({
-      id: row.id,
-      name: row.display_name,   // display_name → name for the frontend
-      latitude: row.latitude,
-      longitude: row.longitude,
-      type: row.type,
-      source: row.source,
-      areaText: row.area_text || undefined,
-      // clipsCount and activeSkaters will come from future tables
-    })
-  );
+  const rows = data || [];
+
+  // Batch-fetch usernames for user-submitted spots. Official spots have
+  // created_by = null so they're excluded. profiles RLS only returns public
+  // profiles via the anon key — private-profile submitters show no username.
+  const userIds = [
+    ...new Set(
+      rows
+        .filter((r) => r.source === "user" && r.created_by)
+        .map((r) => r.created_by as string)
+    ),
+  ];
+
+  const usernameById: Record<string, string> = {};
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, username")
+      .in("id", userIds);
+
+    (profiles || []).forEach((p: { id: string; username: string | null }) => {
+      if (p.username) usernameById[p.id] = p.username;
+    });
+  }
+
+  return rows.map((row): Spot => ({
+    id: row.id,
+    name: row.display_name,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    type: row.type,
+    source: row.source,
+    areaText: row.area_text || undefined,
+    submitterUsername:
+      row.source === "user" && row.created_by
+        ? usernameById[row.created_by]
+        : undefined,
+  }));
 }
 
 /**

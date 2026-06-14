@@ -26,6 +26,8 @@ export type Spot = {
   activeSkaters?: number;
   /** Optional area/city label used for grouped list sections (e.g., "Atlanta, GA") - set by backfill script or imports */
   areaText?: string;
+  /** Username of the skater who submitted this spot (user-added spots only) */
+  submitterUsername?: string;
 };
 
 // ============================================================

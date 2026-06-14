@@ -42,17 +42,19 @@ interface SpotMarkerProps {
 function createSpotIcon(spot: Spot): L.DivIcon {
   const isOfficial = spot.source === "official";
   // Larger, easier-to-see icons — official spots a touch bigger.
-  const iconSize = isOfficial ? 40 : 34;
+  const iconSize = isOfficial ? 48 : 44;
+  // Wrapper is a fixed 56px tap target that comfortably holds the icon.
+  const wrapper = 56;
 
   return L.divIcon({
     className: "", // reset Leaflet's default styling
-    iconSize: [48, 48],
-    iconAnchor: [24, 24], // center the icon on the coordinate
-    popupAnchor: [0, -24], // popup opens above the marker
+    iconSize: [wrapper, wrapper],
+    iconAnchor: [wrapper / 2, wrapper / 2], // center the icon on the coordinate
+    popupAnchor: [0, -wrapper / 2], // popup opens above the marker
     html: `
       <div style="
         display:flex;align-items:center;justify-content:center;
-        width:48px;height:48px;cursor:pointer;
+        width:${wrapper}px;height:${wrapper}px;cursor:pointer;
       ">
         <img src="/images/skateicon.png" alt="" style="
           width:${iconSize}px;height:${iconSize}px;object-fit:contain;

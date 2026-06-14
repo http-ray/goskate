@@ -32,10 +32,11 @@ function detectPlatform(url: string): Platform {
 
 type Props = {
   userId: string;
+  spotId?: string;
   onClipAdded: (clip: ProfileClip) => void;
 };
 
-export default function AddClipForm({ userId, onClipAdded }: Props) {
+export default function AddClipForm({ userId, spotId, onClipAdded }: Props) {
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [url, setUrl] = useState("");
@@ -89,6 +90,7 @@ export default function AddClipForm({ userId, onClipAdded }: Props) {
         platform,
         title: title.trim() || undefined,
         caption: caption.trim() || undefined,
+        spot_id: spotId || undefined,
       };
 
       // Insert the clip first to get the ID, then upload cover if provided

@@ -123,22 +123,6 @@ export default function MapView() {
   // ---- Active filter (lifted from VisibleSpotsPanel so map visuals match) ----
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
 
-  // ---- Check-in state ----
-  // A Set of spot IDs the user has checked into (frontend-only).
-  const [checkedInSpots, setCheckedInSpots] = useState<Set<string>>(new Set());
-
-  const handleToggleCheckIn = useCallback((spotId: string) => {
-    setCheckedInSpots((prev) => {
-      const next = new Set(prev);
-      if (next.has(spotId)) {
-        next.delete(spotId); // check out
-      } else {
-        next.add(spotId); // check in
-      }
-      return next;
-    });
-  }, []);
-
   // ---- Visible spots state ----
   // Tracks which spots fall inside the current map viewport.
   // Updated whenever the user pans or zooms via the moveend/zoomend effect below.
@@ -367,9 +351,6 @@ export default function MapView() {
             <SpotMarker
               key={spot.id}
               spot={spot}
-              checkInCount={checkedInSpots.has(spot.id) ? 1 : 0}
-              isCheckedIn={checkedInSpots.has(spot.id)}
-              onToggleCheckIn={handleToggleCheckIn}
               onAddClip={handleOpenAddClip}
             />
           ))}

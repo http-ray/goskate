@@ -24,13 +24,6 @@ import SpotPopup from "./SpotPopup";
 
 interface SpotMarkerProps {
   spot: Spot;
-  /** Extra check-in count for this spot (frontend-only) */
-  checkInCount: number;
-  /** Whether the current user is checked in */
-  isCheckedIn: boolean;
-  /** Toggle check-in callback */
-  onToggleCheckIn: (spotId: string) => void;
-  /** Open add-clip modal callback */
   onAddClip: (spot: Spot) => void;
 }
 
@@ -65,31 +58,18 @@ function createSpotIcon(spot: Spot): L.DivIcon {
   });
 }
 
-export default function SpotMarker({
-  spot,
-  checkInCount,
-  isCheckedIn,
-  onToggleCheckIn,
-  onAddClip,
-}: SpotMarkerProps) {
+export default function SpotMarker({ spot, onAddClip }: SpotMarkerProps) {
   const icon = createSpotIcon(spot);
 
   return (
     <Marker position={[spot.latitude, spot.longitude]} icon={icon}>
-      {/* Popup content — now includes action buttons */}
       <Popup
         closeButton={true}
         autoPan={true}
         maxWidth={280}
         className="goskate-popup"
       >
-        <SpotPopup
-          spot={spot}
-          checkInCount={checkInCount}
-          isCheckedIn={isCheckedIn}
-          onToggleCheckIn={onToggleCheckIn}
-          onAddClip={onAddClip}
-        />
+        <SpotPopup spot={spot} onAddClip={onAddClip} />
       </Popup>
     </Marker>
   );

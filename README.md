@@ -64,14 +64,6 @@ npm run start     # run the production build
 npm run lint       # ESLint
 ```
 
-### Data scripts (require `.env.local`)
-
-```bash
-npx tsx scripts/import-osm-spots.ts --region west-la
-npx tsx scripts/enrich-spots.ts
-npx tsx scripts/backfill-city-from-coordinates.ts --dry-run
-```
-
 ---
 
 ## Environment Variables

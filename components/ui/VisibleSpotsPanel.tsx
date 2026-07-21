@@ -27,8 +27,36 @@
 
 import { useState, useMemo } from "react";
 import { Spot } from "@/types/spot";
+import { STATE_NAMES, stateFromCoords, isStateCode } from "@/lib/usStates";
 
 export type FilterType = "all" | "skatepark" | "street";
+
+const OTHER_STATE = "Other";
+const OTHER_CITY = "Other spots";
+
+// Resolve a spot's state + city for grouping.
+// Priority: an explicit ", ST" suffix in area_text (accurate, set by the
+// import scripts); otherwise fall back to an approximate state from the
+// spot's coordinates and use the raw area_text (if any) as the city label.
+function resolveStateCity(spot: Spot): { state: string; city: string } {
+  const area = spot.areaText?.trim();
+
+  if (area) {
+    const tokens = area.split(",").map((t) => t.trim());
+    const last = tokens[tokens.length - 1];
+    if (isStateCode(last)) {
+      const city = tokens.slice(0, -1).join(", ").trim();
+      return { state: STATE_NAMES[last], city: city || OTHER_CITY };
+    }
+    // area_text without a state code — treat it as a city label and
+    // derive the state from coordinates.
+    const code = stateFromCoords(spot.latitude, spot.longitude);
+    return { state: code ? STATE_NAMES[code] : OTHER_STATE, city: area };
+  }
+
+  const code = stateFromCoords(spot.latitude, spot.longitude);
+  return { state: code ? STATE_NAMES[code] : OTHER_STATE, city: OTHER_CITY };
+}
 
 interface VisibleSpotsPanelProps {
   spots: Spot[];
@@ -79,33 +107,42 @@ export default function VisibleSpotsPanel({
     });
   }, [spots, searchText]);
 
-  // ---- Group by area ----
-  const groupedSpots = useMemo(() => {
-    const groups = new Map<string, Spot[]>();
+  // ---- Group by state → city ----
+  // Two levels: each state holds one or more cities, each city holds spots.
+  const groupedByState = useMemo(() => {
+    const states = new Map<string, Map<string, Spot[]>>();
 
     filteredSpots.forEach((spot) => {
-      // Priority: areaText → "Other Nearby"
-      const key = spot.areaText || "Other Nearby";
-
-      if (!groups.has(key)) {
-        groups.set(key, []);
-      }
-      groups.get(key)!.push(spot);
+      const { state, city } = resolveStateCity(spot);
+      if (!states.has(state)) states.set(state, new Map());
+      const cities = states.get(state)!;
+      if (!cities.has(city)) cities.set(city, []);
+      cities.get(city)!.push(spot);
     });
 
-    // Sort groups alphabetically, but keep "Other Nearby" last
-    const sortedKeys = Array.from(groups.keys()).sort((a, b) => {
-      if (a === "Other Nearby") return 1;
-      if (b === "Other Nearby") return -1;
+    // Sort helper: a label that is the "Other" bucket always sorts last.
+    const cmp = (other: string) => (a: string, b: string) => {
+      if (a === other) return 1;
+      if (b === other) return -1;
       return a.localeCompare(b);
-    });
+    };
 
-    // Sort spots within each group alphabetically
-    sortedKeys.forEach((key) => {
-      groups.get(key)!.sort((a, b) => a.name.localeCompare(b.name));
-    });
+    const stateNames = Array.from(states.keys()).sort(cmp(OTHER_STATE));
 
-    return { groups, sortedKeys };
+    return stateNames.map((state) => {
+      const cities = states.get(state)!;
+      const cityNames = Array.from(cities.keys()).sort(cmp(OTHER_CITY));
+      let total = 0;
+      const cityGroups = cityNames.map((city) => {
+        const spotsInCity = cities
+          .get(city)!
+          .slice()
+          .sort((a, b) => a.name.localeCompare(b.name));
+        total += spotsInCity.length;
+        return { city, spots: spotsInCity };
+      });
+      return { state, total, cities: cityGroups };
+    });
   }, [filteredSpots]);
 
   // ---- Shared spot-row renderer ----
@@ -302,33 +339,32 @@ export default function VisibleSpotsPanel({
     );
   }
 
-  // ---- Render grouped spots list ----
+  // ---- Render grouped spots list (State → City → spots) ----
   function renderSpotsList(closeOnClick: boolean) {
     if (filteredSpots.length === 0) return emptyMessage;
 
-    // While searching, force every matching section open so results show.
-    // Otherwise sections stay collapsed until the user taps them.
+    // While searching, force every state section open so results show.
+    // Otherwise states stay collapsed until the user taps them.
     const isSearching = searchText.trim().length > 0;
 
-    return groupedSpots.sortedKeys.map((groupKey) => {
-      const groupSpots = groupedSpots.groups.get(groupKey)!;
-      const isExpanded = isSearching || expandedAreas.has(groupKey);
+    return groupedByState.map(({ state, total, cities }) => {
+      const isExpanded = isSearching || expandedAreas.has(state);
 
       return (
-        <div key={groupKey} className="border-b border-line-soft last:border-0">
-          {/* Collapsible area header — click to expand/collapse */}
+        <div key={state} className="border-b border-line-soft last:border-0">
+          {/* Collapsible STATE header */}
           <button
             type="button"
-            onClick={() => toggleArea(groupKey)}
+            onClick={() => toggleArea(state)}
             aria-expanded={isExpanded}
             className="flex w-full items-center justify-between gap-2 bg-elevated px-4 py-2.5 text-left transition-colors hover:bg-line/30"
           >
             <span className="truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-faint">
-              {groupKey}
+              {state}
             </span>
             <span className="flex flex-shrink-0 items-center gap-2">
               <span className="rounded-full bg-surface px-2 py-0.5 text-[11px] font-medium text-muted">
-                {groupSpots.length}
+                {total}
               </span>
               <svg
                 className="text-faint transition-transform"
@@ -348,9 +384,21 @@ export default function VisibleSpotsPanel({
             </span>
           </button>
 
-          {/* Spots in this group — hidden when the section is collapsed */}
+          {/* Cities within the state (each with a light subheader) */}
           {isExpanded &&
-            groupSpots.map((spot) => renderSpotRow(spot, closeOnClick))}
+            cities.map(({ city, spots: citySpots }) => (
+              <div key={city}>
+                <div className="flex items-center justify-between gap-2 border-b border-line-soft bg-surface/60 px-4 py-1.5">
+                  <span className="truncate text-[11px] font-medium text-muted">
+                    {city}
+                  </span>
+                  <span className="flex-shrink-0 text-[11px] text-faint">
+                    {citySpots.length}
+                  </span>
+                </div>
+                {citySpots.map((spot) => renderSpotRow(spot, closeOnClick))}
+              </div>
+            ))}
         </div>
       );
     });

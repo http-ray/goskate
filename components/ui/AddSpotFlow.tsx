@@ -21,6 +21,7 @@ import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { submitSpot, checkNearbySpots } from "@/lib/spotsService";
 import type { SpotSubmission } from "@/types/spot";
+import { LIMITS } from "@/lib/validation";
 
 interface AddSpotFlowProps {
   isOpen: boolean;
@@ -523,6 +524,7 @@ export default function AddSpotFlow({
                   onChange={(e) => setSpotName(e.target.value)}
                   placeholder="e.g. Downtown Ledges"
                   required
+                  maxLength={LIMITS.spotName}
                   className="mt-2 w-full gs-input"
                 />
               </div>
@@ -568,6 +570,7 @@ export default function AddSpotFlow({
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Describe the spot..."
                   rows={3}
+                  maxLength={LIMITS.spotDescription}
                   className="mt-2 w-full resize-none gs-input"
                 />
               </div>
@@ -605,6 +608,7 @@ export default function AddSpotFlow({
                   value={areaText}
                   onChange={(e) => setAreaText(e.target.value)}
                   placeholder="e.g. Downtown, near 5th St"
+                  maxLength={LIMITS.areaText}
                   className="mt-2 w-full gs-input"
                 />
               </div>

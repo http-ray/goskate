@@ -18,7 +18,10 @@ export default function PublicProfilePage() {
   const { user } = useAuth();
   const toast = useToast();
 
-  const [profile, setProfile] = useState<Profile | null | "not_found" | "private">(null);
+  // With the anon key, RLS makes a private profile indistinguishable from a
+  // missing one (getProfileByUsername filters is_public = true → returns null),
+  // so we only need a single "not_found" state.
+  const [profile, setProfile] = useState<Profile | null | "not_found">(null);
   const [followCounts, setFollowCounts] = useState<FollowCounts>({ followers: 0, following: 0 });
   const [isFollowing, setIsFollowing] = useState(false);
   const [clips, setClips] = useState<ProfileClip[]>([]);
@@ -26,7 +29,7 @@ export default function PublicProfilePage() {
   const [followLoading, setFollowLoading] = useState(false);
 
   const isOwnProfile =
-    user && profile && profile !== "not_found" && profile !== "private"
+    user && profile && profile !== "not_found"
       ? user.id === (profile as Profile).id
       : false;
 
@@ -60,7 +63,7 @@ export default function PublicProfilePage() {
   }, [username, user]);
 
   async function handleFollowToggle() {
-    if (!profile || profile === "not_found" || profile === "private") return;
+    if (!profile || profile === "not_found") return;
     setFollowLoading(true);
     try {
       if (isFollowing) {
@@ -88,18 +91,14 @@ export default function PublicProfilePage() {
     );
   }
 
-  // ---- Not found / private ----
-  if (profile === "not_found" || profile === "private") {
+  // ---- Not found or private (indistinguishable under RLS) ----
+  if (profile === "not_found") {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base px-6 text-ink">
-        <p className="text-lg font-semibold">
-          {profile === "private" ? "This profile is private." : "Profile not found"}
+        <p className="text-lg font-semibold">Profile not found</p>
+        <p className="text-sm text-muted">
+          @{username} doesn&apos;t exist or their profile is private.
         </p>
-        {profile === "not_found" && (
-          <p className="text-sm text-muted">
-            @{username} doesn&apos;t exist or their profile is private.
-          </p>
-        )}
         <Link href="/map" className="mt-2 text-sm text-muted underline-offset-2 hover:underline">
           ← Back to map
         </Link>

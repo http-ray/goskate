@@ -14,6 +14,13 @@
 
 import { supabase } from "@/lib/supabase";
 import type { Spot, SupabaseSpotRow, SpotSubmission } from "@/types/spot";
+import {
+  LIMITS,
+  capText,
+  capOrNull,
+  isValidLatitude,
+  isValidLongitude,
+} from "@/lib/validation";
 
 /**
  * Fetches all publicly visible spots from Supabase.
@@ -135,18 +142,34 @@ export async function submitSpot(
   userId: string,
   submission: SpotSubmission
 ): Promise<string> {
+  // Validate + cap user input before writing.
+  const name = capText(submission.display_name, LIMITS.spotName);
+  if (!name) {
+    throw new Error("Spot name is required.");
+  }
+  if (
+    !isValidLatitude(submission.latitude) ||
+    !isValidLongitude(submission.longitude)
+  ) {
+    throw new Error("Spot location is invalid.");
+  }
+
   const { data, error } = await supabase
     .from("spots")
     .insert({
-      display_name: submission.display_name,
+      display_name: name,
       type: submission.type,
       source: "user",
       status: "pending",
       latitude: submission.latitude,
       longitude: submission.longitude,
-      description: submission.description || null,
+      description: submission.description
+        ? capOrNull(submission.description, LIMITS.spotDescription)
+        : null,
       obstacle_tags: submission.obstacle_tags || [],
-      area_text: submission.area_text || null,
+      area_text: submission.area_text
+        ? capOrNull(submission.area_text, LIMITS.areaText)
+        : null,
       created_by: userId,
       osm_name: null,
       osm_id: null,

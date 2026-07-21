@@ -16,6 +16,7 @@
 
 import { supabase } from "@/lib/supabase";
 import type { ProfileClip, NewClipInput } from "@/types/social";
+import { LIMITS, capOrNull } from "@/lib/validation";
 
 // ---- getClipsForUser ----
 // Returns clips for a given userId, ordered newest first.
@@ -50,8 +51,8 @@ export async function addClip(clip: NewClipInput): Promise<ProfileClip> {
     .from("profile_clips")
     .insert({
       user_id: user.id,
-      title: clip.title || null,
-      caption: clip.caption || null,
+      title: clip.title ? capOrNull(clip.title, LIMITS.clipTitle) : null,
+      caption: clip.caption ? capOrNull(clip.caption, LIMITS.clipCaption) : null,
       platform: clip.platform,
       external_url: clip.external_url,
       cover_image_url: clip.cover_image_url || null,

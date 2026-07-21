@@ -14,6 +14,13 @@
 
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
+import {
+  LIMITS,
+  USERNAME_RE,
+  capOrNull,
+  normalizeUsername,
+  sanitizeSearchQuery,
+} from "@/lib/validation";
 
 // ============================================================
 // Types
@@ -98,10 +105,11 @@ export async function ensureProfile(user: User): Promise<Profile> {
 
   // 2. Build a fallback username from auth metadata or the email address
   //    (e.g. "dan@example.com" becomes "dan")
-  const fallbackUsername =
-    (user.user_metadata?.username as string | undefined)?.trim() ||
-    user.email?.split("@")[0] ||
-    "skater";
+  const fallbackUsername = normalizeUsername(
+    (user.user_metadata?.username as string | undefined) ||
+      user.email?.split("@")[0] ||
+      "skater"
+  );
 
   // 3. Create the profile row with defaults
   const { data, error } = await supabase
@@ -135,9 +143,31 @@ export async function updateProfile(
   userId: string,
   updates: ProfileUpdate
 ): Promise<Profile> {
+  // Validate + cap user-supplied text before writing.
+  const sanitized: ProfileUpdate = { ...updates };
+
+  if (typeof sanitized.username === "string") {
+    const u = sanitized.username.trim();
+    if (u && !USERNAME_RE.test(u)) {
+      throw new Error(
+        "Username must be 3–30 characters using letters, numbers, . _ or -"
+      );
+    }
+    sanitized.username = u || null;
+  }
+  if (typeof sanitized.display_name === "string") {
+    sanitized.display_name = capOrNull(sanitized.display_name, LIMITS.displayName);
+  }
+  if (typeof sanitized.bio === "string") {
+    sanitized.bio = capOrNull(sanitized.bio, LIMITS.bio);
+  }
+  if (typeof sanitized.local_park === "string") {
+    sanitized.local_park = capOrNull(sanitized.local_park, LIMITS.localPark);
+  }
+
   const { data, error } = await supabase
     .from("profiles")
-    .update(updates)
+    .update(sanitized)
     .eq("id", userId)
     .select()
     .single();
@@ -179,7 +209,8 @@ export async function getProfileByUsername(
 // Returns up to 20 results. Only public profiles are returned.
 // ============================================================
 export async function searchProfiles(query: string): Promise<Profile[]> {
-  const q = query.trim();
+  // Strip characters that could alter the PostgREST .or() filter expression.
+  const q = sanitizeSearchQuery(query);
   if (!q) return [];
 
   const { data, error } = await supabase

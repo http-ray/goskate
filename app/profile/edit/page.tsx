@@ -21,6 +21,7 @@ import {
   type ProfileUpdate,
 } from "@/lib/profilesService";
 import { supabase } from "@/lib/supabase";
+import { LIMITS } from "@/lib/validation";
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -299,12 +300,14 @@ function EditProfileContent() {
             onChange={setUsername}
             prefix="@"
             placeholder="your skate name"
+            maxLength={LIMITS.username}
           />
           <Field
             label="Display Name"
             value={displayName}
             onChange={setDisplayName}
             placeholder="e.g. Alex Hawk"
+            maxLength={LIMITS.displayName}
           />
 
           {/* ---- About ---- */}
@@ -314,12 +317,14 @@ function EditProfileContent() {
             onChange={setBio}
             multiline
             placeholder="A few words about your skating..."
+            maxLength={LIMITS.bio}
           />
           <Field
             label="Local Park"
             value={localPark}
             onChange={setLocalPark}
             placeholder="e.g. Venice Beach Skatepark"
+            maxLength={LIMITS.localPark}
           />
 
           {/* ---- Stance select ---- */}
@@ -395,6 +400,7 @@ function Field({
   placeholder,
   prefix,
   multiline,
+  maxLength,
 }: {
   label: string;
   value: string;
@@ -402,6 +408,7 @@ function Field({
   placeholder?: string;
   prefix?: string;
   multiline?: boolean;
+  maxLength?: number;
 }) {
   const inputClasses =
     "w-full rounded-2xl border border-line-soft bg-field px-4 py-3 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-accent/50";
@@ -415,6 +422,7 @@ function Field({
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           rows={3}
+          maxLength={maxLength}
           className={`${inputClasses} resize-vertical`}
         />
       ) : (
@@ -429,6 +437,7 @@ function Field({
             value={value}
             onChange={(e) => onChange(e.target.value)}
             placeholder={placeholder}
+            maxLength={maxLength}
             className={`${inputClasses} ${prefix ? "pl-8" : ""}`}
           />
         </div>

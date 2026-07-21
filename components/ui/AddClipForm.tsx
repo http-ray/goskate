@@ -17,6 +17,7 @@ import { useRef, useState } from "react";
 import { addClip, uploadClipCover } from "@/lib/clipsService";
 import type { NewClipInput } from "@/types/social";
 import type { ProfileClip } from "@/types/social";
+import { LIMITS } from "@/lib/validation";
 
 type Platform = "tiktok" | "instagram" | "youtube" | "other";
 
@@ -167,6 +168,7 @@ export default function AddClipForm({ userId, spotId, onClipAdded }: Props) {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Switch heel down the LA High 7"
+          maxLength={LIMITS.clipTitle}
           className="w-full rounded-2xl border border-line-soft bg-field px-4 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent/50"
         />
       </label>
@@ -179,6 +181,7 @@ export default function AddClipForm({ userId, spotId, onClipAdded }: Props) {
           onChange={(e) => setCaption(e.target.value)}
           rows={2}
           placeholder="A note about the clip..."
+          maxLength={LIMITS.clipCaption}
           className="w-full resize-none rounded-2xl border border-line-soft bg-field px-4 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent/50"
         />
       </label>

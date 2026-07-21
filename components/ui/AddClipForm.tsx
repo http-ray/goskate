@@ -18,18 +18,10 @@ import { addClip, uploadClipCover } from "@/lib/clipsService";
 import type { NewClipInput } from "@/types/social";
 import type { ProfileClip } from "@/types/social";
 import { LIMITS } from "@/lib/validation";
-
-type Platform = "tiktok" | "instagram" | "youtube" | "other";
+import { detectPlatform, type Platform } from "@/lib/clipUrl";
 
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-
-function detectPlatform(url: string): Platform {
-  if (url.includes("tiktok.com")) return "tiktok";
-  if (url.includes("instagram.com")) return "instagram";
-  if (url.includes("youtube.com") || url.includes("youtu.be")) return "youtube";
-  return "other";
-}
 
 type Props = {
   userId: string;

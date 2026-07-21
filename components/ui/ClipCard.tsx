@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ProfileClip } from "@/types/social";
+import { extractTikTokVideoId, extractInstagramShortcode } from "@/lib/clipUrl";
 
 const PLATFORM_COLORS: Record<string, string> = {
   tiktok: "bg-black text-white border-white/10",
@@ -16,16 +17,6 @@ const PLATFORM_LABELS: Record<string, string> = {
   youtube: "YouTube",
   other: "Clip",
 };
-
-function extractTikTokVideoId(url: string): string | null {
-  const match = url.match(/\/video\/(\d+)/);
-  return match ? match[1] : null;
-}
-
-function extractInstagramShortcode(url: string): string | null {
-  const match = url.match(/instagram\.com\/(?:p|reel|tv)\/([A-Za-z0-9_-]+)/);
-  return match ? match[1] : null;
-}
 
 // ---- MediaSection -------------------------------------------------------
 // Renders the top visual area of the card. TikTok and Instagram use iframes.

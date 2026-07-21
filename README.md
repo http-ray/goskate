@@ -59,9 +59,11 @@ npm run dev                         # http://localhost:3000
 ### Other commands
 
 ```bash
-npm run build     # production build
-npm run start     # run the production build
+npm run build      # production build
+npm run start      # run the production build
 npm run lint       # ESLint
+npm run typecheck  # tsc --noEmit
+npm run test       # Vitest unit tests
 ```
 
 ---
@@ -72,6 +74,7 @@ npm run lint       # ESLint
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | Client + server | Safe to be public |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Client + server | Safe to be public |
+| `NEXT_PUBLIC_SITE_URL` | Metadata / OG / sitemap | Your production URL (e.g. `https://goskate.vercel.app`); falls back to localhost in dev |
 | `GOOGLE_PLACES_API_KEY` | `scripts/enrich-spots.ts` only | Script use only — never used by the frontend |
 
 Never commit `.env.local`. The Supabase service role key is never used in this project — all client/server reads and writes go through the anon key, gated by Row Level Security.
@@ -82,7 +85,8 @@ Never commit `.env.local`. The Supabase service role key is never used in this p
 
 ```
 app/                          Pages + routes (Next.js App Router)
-  page.tsx                    Full-screen map
+  page.tsx                    Landing page (public front door)
+  map/                        Full-screen map
   profile/                    Auth hub, edit, friends (follow lists), settings
   profile/[username]/         Public profile page
   spots/[id]/                 Spot detail page (info + public clips)

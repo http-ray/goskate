@@ -67,6 +67,7 @@ export default function SettingsPage() {
         <SettingsRow
           icon="🔑"
           label="Change Password"
+          comingSoon
           onClick={() => showComingSoon("Change Password")}
         />
         <SettingsRow
@@ -85,16 +86,19 @@ export default function SettingsPage() {
         <SettingsRow
           icon="👁️"
           label="Profile Visibility"
+          comingSoon
           onClick={() => showComingSoon("Privacy settings")}
         />
         <SettingsRow
           icon="📍"
           label="Location Sharing"
+          comingSoon
           onClick={() => showComingSoon("Privacy settings")}
         />
         <SettingsRow
           icon="🚫"
           label="Blocked Users"
+          comingSoon
           onClick={() => showComingSoon("Blocked Users")}
         />
       </SettingsSection>
@@ -104,6 +108,7 @@ export default function SettingsPage() {
         <SettingsRow
           icon="📝"
           label="Send Feedback"
+          comingSoon
           onClick={showFeedbackPlaceholder}
         />
         <SettingsRow icon="ℹ️" label="About GoSkate" onClick={showAbout} />
@@ -146,6 +151,7 @@ function SettingsRow({
   href,
   value,
   danger,
+  comingSoon,
   onClick,
 }: {
   icon: string;
@@ -153,6 +159,7 @@ function SettingsRow({
   href?: string;
   value?: string;
   danger?: boolean;
+  comingSoon?: boolean;
   onClick?: () => void;
 }) {
   const inner = (
@@ -162,6 +169,10 @@ function SettingsRow({
       {value ? (
         <span className="ml-auto text-xs text-faint truncate max-w-[45%] text-right">
           {value}
+        </span>
+      ) : comingSoon ? (
+        <span className="ml-auto rounded-full border border-line bg-elevated px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
+          Soon
         </span>
       ) : (
         <span className="ml-auto text-faint text-sm">›</span>
@@ -188,9 +199,6 @@ function SettingsRow({
     );
   }
 
-  return (
-    <button onClick={() => alert(`${label} — Coming soon`)} className={classes}>
-      {inner}
-    </button>
-  );
+  // No action wired — render an inert row rather than a dead-end dialog.
+  return <div className={`${classes} cursor-default`}>{inner}</div>;
 }

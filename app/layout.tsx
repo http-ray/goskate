@@ -13,9 +13,32 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Set NEXT_PUBLIC_SITE_URL to your production domain in Vercel so
+// absolute OG/canonical URLs resolve correctly. Falls back to localhost
+// in development.
+const siteUrl =
+  process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "GoSkate — Find & Share Skate Spots",
-  description: "Discover skateparks and street spots near you.",
+  description:
+    "Discover skateparks and street spots near you, add your own, follow other skaters, and share your clips — all on one map.",
+  applicationName: "GoSkate",
+  openGraph: {
+    title: "GoSkate — Find & Share Skate Spots",
+    description:
+      "Discover skateparks and street spots near you, add your own, follow other skaters, and share your clips — all on one map.",
+    url: siteUrl,
+    siteName: "GoSkate",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "GoSkate — Find & Share Skate Spots",
+    description:
+      "Discover skateparks and street spots near you. The map built for skaters.",
+  },
 };
 
 export default function RootLayout({

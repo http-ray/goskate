@@ -58,11 +58,11 @@ export default function AdminReviewPage() {
         const admin = data?.is_admin === true;
         setIsAdmin(admin);
         setAccessChecked(true);
-        if (!admin) router.push("/");
+        if (!admin) router.push("/map");
       } catch {
         setIsAdmin(false);
         setAccessChecked(true);
-        router.push("/");
+        router.push("/map");
       }
     })();
   }, [authLoading, user, router]);
@@ -197,7 +197,7 @@ export default function AdminReviewPage() {
               </p>
             </div>
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/map")}
               className="rounded-xl border border-line bg-elevated px-4 py-2 text-sm text-ink transition-colors hover:bg-line/40"
             >
               Back to Map

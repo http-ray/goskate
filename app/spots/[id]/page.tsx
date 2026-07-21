@@ -189,7 +189,7 @@ export default async function SpotPage({ params }: SpotPageProps) {
 
       {/* Back */}
       <Link
-        href="/"
+        href="/map"
         className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-white"
       >
         ← Back to map

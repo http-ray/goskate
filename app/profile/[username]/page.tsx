@@ -98,7 +98,7 @@ export default function PublicProfilePage() {
             @{username} doesn&apos;t exist or their profile is private.
           </p>
         )}
-        <Link href="/" className="mt-2 text-sm text-zinc-400 underline-offset-2 hover:underline">
+        <Link href="/map" className="mt-2 text-sm text-zinc-400 underline-offset-2 hover:underline">
           ← Back to map
         </Link>
       </div>
@@ -129,7 +129,7 @@ export default function PublicProfilePage() {
 
         {/* Back button — top-left of the banner */}
         <Link
-          href="/"
+          href="/map"
           className="absolute left-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-black/60 text-sm text-white backdrop-blur-sm md:left-6 md:top-4"
         >
           ←

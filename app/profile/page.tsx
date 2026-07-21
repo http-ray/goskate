@@ -111,7 +111,7 @@ export default function ProfilePage() {
     try {
       const { error: signOutError } = await supabase.auth.signOut();
       if (signOutError) throw signOutError;
-      router.push("/");
+      router.push("/map");
     } catch (signOutError) {
       setError(signOutError instanceof Error ? signOutError.message : "Could not log out.");
     } finally {
@@ -151,7 +151,7 @@ export default function ProfilePage() {
       <div className="min-h-screen bg-base px-5 py-8 text-ink">
         <div className="mx-auto max-w-lg">
           <Link
-            href="/"
+            href="/map"
             className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-ink"
           >
             ← Back to map
@@ -223,7 +223,7 @@ export default function ProfilePage() {
     <div className="min-h-screen bg-base px-5 py-8 text-ink">
       <div className="mx-auto max-w-lg space-y-4">
         <Link
-          href="/"
+          href="/map"
           className="inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-ink"
         >
           ← Back to map

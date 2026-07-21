@@ -43,7 +43,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-base text-ink px-5 py-8 font-sans max-w-lg mx-auto">
       {/* ---- Back ---- */}
       <Link
-        href="/"
+        href="/map"
         className="inline-flex items-center gap-1 text-sm text-muted hover:text-ink mb-6"
       >
         ← Back to map

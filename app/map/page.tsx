@@ -14,9 +14,23 @@
 
 import dynamic from "next/dynamic";
 
+// Shown while the Leaflet map chunk downloads and hydrates, so the
+// user sees a branded loader instead of a blank black screen.
+function MapLoading() {
+  return (
+    <div className="flex h-screen w-screen items-center justify-center bg-base text-sm text-muted">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-2 border-line border-t-accent" />
+        Loading the map…
+      </div>
+    </div>
+  );
+}
+
 // Dynamic import — skips SSR so Leaflet never runs on the server
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
+  loading: MapLoading,
 });
 
 export default function MapPage() {

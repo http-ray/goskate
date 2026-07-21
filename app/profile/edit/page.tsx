@@ -197,8 +197,8 @@ function EditProfileContent() {
 
   if (authLoading || profileLoading) {
     return (
-      <div className="min-h-screen bg-black px-5 py-8 text-white">
-        <div className="mx-auto flex min-h-[70vh] max-w-lg items-center justify-center text-sm text-zinc-400">
+      <div className="min-h-screen bg-base px-5 py-8 text-ink">
+        <div className="mx-auto flex min-h-[70vh] max-w-lg items-center justify-center text-sm text-muted">
           Loading profile...
         </div>
       </div>
@@ -208,11 +208,11 @@ function EditProfileContent() {
   if (!user || !profile) return null;
 
   return (
-    <div className="min-h-screen bg-black px-5 py-8 text-white">
+    <div className="min-h-screen bg-base px-5 py-8 text-ink">
       <div className="mx-auto max-w-lg">
         <Link
           href={backHref}
-          className="mb-6 inline-flex items-center gap-1 text-sm text-zinc-400 transition-colors hover:text-white"
+          className="mb-6 inline-flex items-center gap-1 text-sm text-muted transition-colors hover:text-ink"
         >
           ← {backLabel}
         </Link>
@@ -220,13 +220,13 @@ function EditProfileContent() {
         <h1 className="mb-6 text-2xl font-bold">Edit Profile</h1>
 
         {profile.parks_visited_count > 0 && (
-          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-white/10 bg-zinc-900/70 px-4 py-3">
+          <div className="mb-6 flex items-center gap-3 rounded-2xl border border-line-soft bg-surface px-4 py-3">
             <span className="text-lg" aria-hidden="true">📍</span>
             <div>
-              <p className="text-xs text-zinc-500">Parks Visited</p>
+              <p className="text-xs text-faint">Parks Visited</p>
               <p className="text-sm font-semibold">{profile.parks_visited_count}</p>
             </div>
-            <p className="ml-auto text-xs text-zinc-600">Auto-tracked</p>
+            <p className="ml-auto text-xs text-faint">Auto-tracked</p>
           </div>
         )}
 
@@ -234,15 +234,15 @@ function EditProfileContent() {
 
           {/* ---- Banner upload ---- */}
           <div className="flex flex-col gap-2">
-            <span className="text-xs text-zinc-500">Banner</span>
+            <span className="text-xs text-faint">Banner</span>
             {bannerUrl ? (
               <img
                 src={bannerUrl}
                 alt="Banner preview"
-                className="h-24 w-full rounded-2xl border border-white/10 object-cover"
+                className="h-24 w-full rounded-2xl border border-line-soft object-cover"
               />
             ) : (
-              <div className="h-24 w-full rounded-2xl border border-white/10 bg-gradient-to-br from-zinc-800 to-zinc-900" />
+              <div className="h-24 w-full rounded-2xl border border-line-soft bg-gradient-to-br from-elevated to-surface" />
             )}
             <input
               ref={bannerInputRef}
@@ -255,7 +255,7 @@ function EditProfileContent() {
               type="button"
               disabled={uploadingBanner}
               onClick={() => bannerInputRef.current?.click()}
-              className="rounded-2xl border border-white/10 bg-zinc-900 py-2 text-xs text-zinc-400 transition-colors hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-2xl border border-line-soft bg-elevated py-2 text-xs text-muted transition-colors hover:border-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
             >
               {uploadingBanner ? "Uploading..." : "Upload Banner"}
             </button>
@@ -267,10 +267,10 @@ function EditProfileContent() {
               <img
                 src={avatarUrl}
                 alt="Avatar preview"
-                className="h-20 w-20 rounded-full border border-white/10 object-cover"
+                className="h-20 w-20 rounded-full border border-line-soft object-cover"
               />
             ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-zinc-800 text-3xl font-bold text-zinc-400">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border border-line-soft bg-elevated text-3xl font-bold text-muted">
                 {(displayName || username)[0]?.toUpperCase() ?? "G"}
               </div>
             )}
@@ -285,11 +285,11 @@ function EditProfileContent() {
               type="button"
               disabled={uploadingAvatar}
               onClick={() => avatarInputRef.current?.click()}
-              className="rounded-2xl border border-white/10 bg-zinc-900 px-4 py-2 text-xs text-zinc-400 transition-colors hover:border-zinc-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-2xl border border-line-soft bg-elevated px-4 py-2 text-xs text-muted transition-colors hover:border-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-60"
             >
               {uploadingAvatar ? "Uploading..." : "Upload Avatar"}
             </button>
-            <p className="text-xs text-zinc-600">JPEG, PNG, or WebP · max 5 MB</p>
+            <p className="text-xs text-faint">JPEG, PNG, or WebP · max 5 MB</p>
           </div>
 
           {/* ---- Identity ---- */}
@@ -324,11 +324,11 @@ function EditProfileContent() {
 
           {/* ---- Stance select ---- */}
           <label className="flex flex-col gap-1">
-            <span className="text-xs text-zinc-500">Stance</span>
+            <span className="text-xs text-faint">Stance</span>
             <select
               value={stance}
               onChange={(e) => setStance(e.target.value as "regular" | "goofy" | "")}
-              className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white outline-none transition-colors focus:border-zinc-500"
+              className="w-full rounded-2xl border border-line-soft bg-field px-4 py-3 text-sm text-ink outline-none transition-colors focus:border-accent/50"
             >
               <option value="">Not set</option>
               <option value="regular">Regular</option>
@@ -339,12 +339,12 @@ function EditProfileContent() {
           {/* ---- Public profile toggle ---- */}
           <div
             role="group"
-            className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-white/10 bg-zinc-900/70 px-4 py-3"
+            className="flex cursor-pointer items-center justify-between gap-3 rounded-2xl border border-line-soft bg-surface px-4 py-3"
             onClick={() => setIsPublic((prev) => !prev)}
           >
             <div>
               <p className="text-sm font-medium">Public Profile</p>
-              <p className="text-xs text-zinc-500">
+              <p className="text-xs text-faint">
                 When off, your profile is hidden from other users.
               </p>
             </div>
@@ -352,7 +352,7 @@ function EditProfileContent() {
               role="switch"
               aria-checked={isPublic}
               className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${
-                isPublic ? "bg-green-500" : "bg-zinc-700"
+                isPublic ? "bg-success" : "bg-line"
               }`}
             >
               <span
@@ -365,12 +365,12 @@ function EditProfileContent() {
 
           {/* ---- Feedback ---- */}
           {error && (
-            <div className="rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-200">
+            <div className="rounded-2xl border border-danger/30 bg-danger/15 px-4 py-3 text-sm text-danger">
               {error}
             </div>
           )}
           {message && (
-            <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+            <div className="rounded-2xl border border-success/30 bg-success/15 px-4 py-3 text-sm text-success">
               {message}
             </div>
           )}
@@ -378,7 +378,7 @@ function EditProfileContent() {
           <button
             type="submit"
             disabled={saving || uploadingAvatar || uploadingBanner}
-            className="w-full rounded-2xl bg-white py-3 text-sm font-semibold text-black transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+            className="w-full rounded-2xl bg-accent py-3 text-sm font-semibold text-on-accent transition-transform hover:bg-accent-press active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? "Saving..." : "Save Changes"}
           </button>
@@ -404,11 +404,11 @@ function Field({
   multiline?: boolean;
 }) {
   const inputClasses =
-    "w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white outline-none transition-colors placeholder:text-zinc-600 focus:border-zinc-500";
+    "w-full rounded-2xl border border-line-soft bg-field px-4 py-3 text-sm text-ink outline-none transition-colors placeholder:text-faint focus:border-accent/50";
 
   return (
     <label className="flex flex-col gap-1">
-      <span className="text-xs text-zinc-500">{label}</span>
+      <span className="text-xs text-faint">{label}</span>
       {multiline ? (
         <textarea
           value={value}
@@ -420,7 +420,7 @@ function Field({
       ) : (
         <div className="relative">
           {prefix && (
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-zinc-500">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm text-faint">
               {prefix}
             </span>
           )}

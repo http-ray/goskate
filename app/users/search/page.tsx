@@ -53,13 +53,13 @@ export default function UserSearchPage() {
   }, [query, toast]);
 
   return (
-    <div className="min-h-screen bg-black px-4 py-8 text-white">
+    <div className="min-h-screen bg-base px-4 py-8 text-ink">
       <div className="mx-auto max-w-lg">
         {/* Header */}
         <div className="mb-6 flex items-center gap-3">
           <Link
             href="/map"
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/10 text-sm text-zinc-400 hover:text-white"
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-line-soft text-sm text-muted hover:text-ink"
           >
             ←
           </Link>
@@ -74,10 +74,10 @@ export default function UserSearchPage() {
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search by username, name, or local park..."
             autoFocus
-            className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-3 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-zinc-500"
+            className="w-full rounded-2xl border border-line-soft bg-field px-4 py-3 text-sm text-ink outline-none placeholder:text-faint focus:border-accent/50"
           />
           {searching && (
-            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-zinc-500">
+            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-faint">
               Searching...
             </span>
           )}
@@ -85,7 +85,7 @@ export default function UserSearchPage() {
 
         {/* Results */}
         {hasSearched && results.length === 0 && (
-          <p className="text-center text-sm text-zinc-500">
+          <p className="text-center text-sm text-faint">
             No skaters found for &ldquo;{query}&rdquo;
           </p>
         )}
@@ -103,7 +103,7 @@ export default function UserSearchPage() {
         )}
 
         {!hasSearched && !searching && (
-          <p className="mt-12 text-center text-sm text-zinc-600">
+          <p className="mt-12 text-center text-sm text-faint">
             Type a username, display name, or local park to find skaters.
           </p>
         )}

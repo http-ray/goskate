@@ -82,7 +82,7 @@ export default function PublicProfilePage() {
   // ---- Loading ----
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-black text-sm text-zinc-400">
+      <div className="flex min-h-screen items-center justify-center bg-base text-sm text-muted">
         Loading profile...
       </div>
     );
@@ -91,16 +91,16 @@ export default function PublicProfilePage() {
   // ---- Not found / private ----
   if (profile === "not_found" || profile === "private") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-black px-6 text-white">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-base px-6 text-ink">
         <p className="text-lg font-semibold">
           {profile === "private" ? "This profile is private." : "Profile not found"}
         </p>
         {profile === "not_found" && (
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-muted">
             @{username} doesn&apos;t exist or their profile is private.
           </p>
         )}
-        <Link href="/map" className="mt-2 text-sm text-zinc-400 underline-offset-2 hover:underline">
+        <Link href="/map" className="mt-2 text-sm text-muted underline-offset-2 hover:underline">
           ← Back to map
         </Link>
       </div>
@@ -112,7 +112,7 @@ export default function PublicProfilePage() {
   const initials = displayName[0]?.toUpperCase() ?? "G";
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-black text-white">
+    <div className="min-h-screen overflow-x-hidden bg-base text-ink">
 
       {/* ============================================================
           Banner — always full viewport width.
@@ -126,7 +126,7 @@ export default function PublicProfilePage() {
             className="h-36 w-full object-cover md:h-52"
           />
         ) : (
-          <div className="h-36 w-full bg-gradient-to-br from-zinc-800 to-zinc-900 md:h-52" />
+          <div className="h-36 w-full bg-gradient-to-br from-elevated to-surface md:h-52" />
         )}
 
         {/* Back button — top-left of the banner */}
@@ -165,10 +165,10 @@ export default function PublicProfilePage() {
               <img
                 src={p.avatar_url}
                 alt={displayName}
-                className="h-20 w-20 rounded-full border-4 border-black object-cover md:h-28 md:w-28"
+                className="h-20 w-20 rounded-full border-4 border-base object-cover md:h-28 md:w-28"
               />
             ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-black bg-zinc-700 text-2xl font-bold md:h-28 md:w-28 md:text-3xl">
+              <div className="flex h-20 w-20 items-center justify-center rounded-full border-4 border-base bg-elevated text-2xl font-bold md:h-28 md:w-28 md:text-3xl">
                 {initials}
               </div>
             )}
@@ -179,7 +179,7 @@ export default function PublicProfilePage() {
             {isOwnProfile ? (
               <Link
                 href="/profile/edit"
-                className="inline-block rounded-2xl border border-white/20 px-4 py-2 text-sm font-medium text-white transition-colors hover:border-white/40 md:px-5 md:py-2.5 md:text-base"
+                className="inline-block rounded-2xl border border-line px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-muted md:px-5 md:py-2.5 md:text-base"
               >
                 Edit Profile
               </Link>
@@ -189,8 +189,8 @@ export default function PublicProfilePage() {
                 disabled={followLoading}
                 className={`rounded-2xl px-5 py-2 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 md:px-6 md:py-2.5 md:text-base ${
                   isFollowing
-                    ? "border border-white/20 text-zinc-300 hover:border-red-500/40 hover:text-red-400"
-                    : "bg-white text-black hover:bg-zinc-200"
+                    ? "border border-line text-muted hover:border-danger/40 hover:text-danger"
+                    : "bg-accent text-on-accent hover:bg-accent-press"
                 }`}
               >
                 {followLoading ? "..." : isFollowing ? "Following" : "Follow"}
@@ -198,7 +198,7 @@ export default function PublicProfilePage() {
             ) : (
               <Link
                 href="/profile"
-                className="inline-block rounded-2xl bg-white px-5 py-2 text-sm font-semibold text-black hover:bg-zinc-200 md:px-6 md:py-2.5 md:text-base"
+                className="inline-block rounded-2xl bg-accent px-5 py-2 text-sm font-semibold text-on-accent hover:bg-accent-press md:px-6 md:py-2.5 md:text-base"
               >
                 Sign in to Follow
               </Link>
@@ -211,19 +211,19 @@ export default function PublicProfilePage() {
           {displayName}
         </h1>
         {p.username && (
-          <p className="mb-2 break-all text-sm text-zinc-400 md:text-base">
+          <p className="mb-2 break-all text-sm text-muted md:text-base">
             @{p.username}
           </p>
         )}
 
         {/* ---- Follow counts ---- */}
-        <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-300 md:mb-4 md:gap-x-8 md:text-base">
+        <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-sm text-muted md:mb-4 md:gap-x-8 md:text-base">
           <span>
-            <span className="font-bold text-white">{followCounts.followers}</span>{" "}
+            <span className="font-bold text-ink">{followCounts.followers}</span>{" "}
             Followers
           </span>
           <span>
-            <span className="font-bold text-white">{followCounts.following}</span>{" "}
+            <span className="font-bold text-ink">{followCounts.following}</span>{" "}
             Following
           </span>
         </div>
@@ -232,17 +232,17 @@ export default function PublicProfilePage() {
         {(p.stance || p.local_park || p.parks_visited_count > 0) && (
           <div className="mb-3 flex flex-wrap gap-2 md:mb-5">
             {p.stance && (
-              <span className="rounded-full border border-white/10 bg-zinc-900 px-3 py-1 text-xs capitalize text-zinc-300 md:text-sm">
+              <span className="rounded-full border border-line-soft bg-surface px-3 py-1 text-xs capitalize text-muted md:text-sm">
                 {p.stance}
               </span>
             )}
             {p.local_park && (
-              <span className="max-w-[200px] truncate rounded-full border border-white/10 bg-zinc-900 px-3 py-1 text-xs text-zinc-300 md:max-w-none md:text-sm">
+              <span className="max-w-[200px] truncate rounded-full border border-line-soft bg-surface px-3 py-1 text-xs text-muted md:max-w-none md:text-sm">
                 📍 {p.local_park}
               </span>
             )}
             {p.parks_visited_count > 0 && (
-              <span className="rounded-full border border-white/10 bg-zinc-900 px-3 py-1 text-xs text-zinc-300 md:text-sm">
+              <span className="rounded-full border border-line-soft bg-surface px-3 py-1 text-xs text-muted md:text-sm">
                 {p.parks_visited_count} parks visited
               </span>
             )}
@@ -251,18 +251,18 @@ export default function PublicProfilePage() {
 
         {/* ---- Bio ---- */}
         {p.bio && (
-          <p className="mb-5 break-words text-sm leading-relaxed text-zinc-300 md:mb-6 md:text-base">
+          <p className="mb-5 break-words text-sm leading-relaxed text-muted md:mb-6 md:text-base">
             {p.bio}
           </p>
         )}
 
         {/* ---- Clips section ---- */}
         <div className="mb-12">
-          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500 md:mb-4 md:text-sm">
+          <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-faint md:mb-4 md:text-sm">
             Clips
           </h2>
           {clips.length === 0 ? (
-            <p className="text-sm text-zinc-500">No clips yet.</p>
+            <p className="text-sm text-faint">No clips yet.</p>
           ) : (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4">
               {clips.map((clip) => (

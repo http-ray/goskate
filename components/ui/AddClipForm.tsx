@@ -127,30 +127,30 @@ export default function AddClipForm({ userId, spotId, onClipAdded }: Props) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="flex flex-col gap-4 rounded-2xl border border-white/10 bg-zinc-900/60 p-4"
+      className="flex flex-col gap-4 rounded-2xl border border-line-soft bg-surface/60 p-4"
     >
-      <p className="text-sm font-semibold text-white">Add a Clip</p>
+      <p className="text-sm font-semibold text-ink">Add a Clip</p>
 
       {/* URL */}
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500">Clip URL (required)</span>
+        <span className="text-xs text-faint">Clip URL (required)</span>
         <input
           type="url"
           value={url}
           onChange={(e) => handleUrlChange(e.target.value)}
           placeholder="https://www.tiktok.com/..."
           required
-          className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-zinc-500"
+          className="w-full rounded-2xl border border-line-soft bg-field px-4 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent/50"
         />
       </label>
 
       {/* Platform */}
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500">Platform</span>
+        <span className="text-xs text-faint">Platform</span>
         <select
           value={platform}
           onChange={(e) => setPlatform(e.target.value as Platform)}
-          className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none focus:border-zinc-500"
+          className="w-full rounded-2xl border border-line-soft bg-field px-4 py-2.5 text-sm text-ink outline-none focus:border-accent/50"
         >
           <option value="tiktok">TikTok</option>
           <option value="instagram">Instagram</option>
@@ -161,31 +161,31 @@ export default function AddClipForm({ userId, spotId, onClipAdded }: Props) {
 
       {/* Title */}
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500">Title (optional)</span>
+        <span className="text-xs text-faint">Title (optional)</span>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="e.g. Switch heel down the LA High 7"
-          className="w-full rounded-2xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-zinc-500"
+          className="w-full rounded-2xl border border-line-soft bg-field px-4 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent/50"
         />
       </label>
 
       {/* Caption */}
       <label className="flex flex-col gap-1">
-        <span className="text-xs text-zinc-500">Caption (optional)</span>
+        <span className="text-xs text-faint">Caption (optional)</span>
         <textarea
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
           rows={2}
           placeholder="A note about the clip..."
-          className="w-full resize-none rounded-2xl border border-white/10 bg-zinc-900 px-4 py-2.5 text-sm text-white outline-none placeholder:text-zinc-600 focus:border-zinc-500"
+          className="w-full resize-none rounded-2xl border border-line-soft bg-field px-4 py-2.5 text-sm text-ink outline-none placeholder:text-faint focus:border-accent/50"
         />
       </label>
 
       {/* Cover image */}
       <div className="flex flex-col gap-2">
-        <span className="text-xs text-zinc-500">Cover Image (optional)</span>
+        <span className="text-xs text-faint">Cover Image (optional)</span>
         {coverPreview && (
           <img
             src={coverPreview}
@@ -203,15 +203,15 @@ export default function AddClipForm({ userId, spotId, onClipAdded }: Props) {
         <button
           type="button"
           onClick={() => coverInputRef.current?.click()}
-          className="rounded-2xl border border-white/10 py-2 text-xs text-zinc-400 transition-colors hover:border-zinc-500 hover:text-white"
+          className="rounded-2xl border border-line-soft py-2 text-xs text-muted transition-colors hover:border-muted hover:text-ink"
         >
           {coverFile ? "Change Cover" : "Upload Cover"}
         </button>
-        <p className="text-xs text-zinc-600">JPEG, PNG, or WebP · max 5 MB</p>
+        <p className="text-xs text-faint">JPEG, PNG, or WebP · max 5 MB</p>
       </div>
 
       {error && (
-        <p className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">
+        <p className="rounded-xl border border-danger/30 bg-danger/15 px-3 py-2 text-xs text-danger">
           {error}
         </p>
       )}
@@ -219,7 +219,7 @@ export default function AddClipForm({ userId, spotId, onClipAdded }: Props) {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-2xl bg-white py-2.5 text-sm font-semibold text-black transition-transform active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-2xl bg-accent py-2.5 text-sm font-semibold text-on-accent transition-transform hover:bg-accent-press active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? "Adding..." : "Add Clip"}
       </button>

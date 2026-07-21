@@ -7,7 +7,7 @@ const PLATFORM_COLORS: Record<string, string> = {
   tiktok: "bg-black text-white border-white/10",
   instagram: "bg-gradient-to-br from-purple-600 to-pink-500 text-white border-transparent",
   youtube: "bg-red-600 text-white border-transparent",
-  other: "bg-zinc-800 text-zinc-300 border-white/10",
+  other: "bg-elevated text-muted border-line-soft",
 };
 
 const PLATFORM_LABELS: Record<string, string> = {
@@ -119,13 +119,13 @@ export default function ClipCard({ clip, onDelete }: Props) {
   const platformColor = PLATFORM_COLORS[clip.platform] ?? PLATFORM_COLORS.other;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-zinc-900">
+    <div className="overflow-hidden rounded-2xl border border-line-soft bg-surface">
       <MediaSection clip={clip} />
 
       {/* Info row */}
       <div className="p-3">
         <div className="mb-1 flex items-start justify-between gap-2">
-          <p className="flex-1 truncate text-sm font-medium text-white">
+          <p className="flex-1 truncate text-sm font-medium text-ink">
             {clip.title ?? "Untitled clip"}
           </p>
           <span
@@ -136,7 +136,7 @@ export default function ClipCard({ clip, onDelete }: Props) {
         </div>
 
         {clip.caption && (
-          <p className="mb-2 line-clamp-2 text-xs text-zinc-400">{clip.caption}</p>
+          <p className="mb-2 line-clamp-2 text-xs text-muted">{clip.caption}</p>
         )}
 
         <div className="flex items-center justify-between gap-2">
@@ -144,7 +144,7 @@ export default function ClipCard({ clip, onDelete }: Props) {
             href={clip.external_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-zinc-400 underline-offset-2 hover:text-white hover:underline"
+            className="text-xs text-muted underline-offset-2 hover:text-ink hover:underline"
           >
             Open original ↗
           </a>
@@ -152,7 +152,7 @@ export default function ClipCard({ clip, onDelete }: Props) {
           {onDelete && (
             <button
               onClick={() => onDelete(clip)}
-              className="text-xs text-zinc-600 transition-colors hover:text-red-400"
+              className="text-xs text-faint transition-colors hover:text-danger"
             >
               Delete
             </button>

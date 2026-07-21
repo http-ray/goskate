@@ -60,33 +60,33 @@ export default function ProfileCard({
   return (
     <Link
       href={profileHref}
-      className="flex items-center gap-3 rounded-2xl border border-white/10 bg-zinc-900/60 px-4 py-3 transition-colors hover:border-zinc-600 hover:bg-zinc-900"
+      className="flex items-center gap-3 rounded-2xl border border-line-soft bg-surface/60 px-4 py-3 transition-colors hover:border-line hover:bg-surface"
     >
       {/* Avatar */}
       {profile.avatar_url ? (
         <img
           src={profile.avatar_url}
           alt={displayName}
-          className="h-11 w-11 shrink-0 rounded-full border border-white/10 object-cover"
+          className="h-11 w-11 shrink-0 rounded-full border border-line-soft object-cover"
         />
       ) : (
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 bg-zinc-700 text-lg font-bold text-white">
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-line-soft bg-elevated text-lg font-bold text-ink">
           {initials}
         </div>
       )}
 
       {/* Info */}
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold text-white">{displayName}</p>
+        <p className="truncate text-sm font-semibold text-ink">{displayName}</p>
         {displayHandle && (
-          <p className="truncate text-xs text-zinc-400">{displayHandle}</p>
+          <p className="truncate text-xs text-muted">{displayHandle}</p>
         )}
         <div className="mt-0.5 flex flex-wrap gap-2">
           {profile.stance && (
-            <span className="text-xs text-zinc-500">{profile.stance}</span>
+            <span className="text-xs text-faint">{profile.stance}</span>
           )}
           {profile.local_park && (
-            <span className="truncate text-xs text-zinc-500">
+            <span className="truncate text-xs text-faint">
               📍 {profile.local_park}
             </span>
           )}
@@ -100,8 +100,8 @@ export default function ProfileCard({
           disabled={loading}
           className={`shrink-0 rounded-full px-4 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
             following
-              ? "border border-white/20 text-zinc-300 hover:border-red-500/40 hover:text-red-400"
-              : "bg-white text-black hover:bg-zinc-200"
+              ? "border border-line text-muted hover:border-danger/40 hover:text-danger"
+              : "bg-accent text-on-accent hover:bg-accent-press"
           }`}
         >
           {loading ? "..." : following ? "Following" : "Follow"}

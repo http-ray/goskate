@@ -16,6 +16,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/ui/Toast";
 import { supabase } from "@/lib/supabase";
 import type { SupabaseSpotRow } from "@/types/spot";
 
@@ -27,6 +28,7 @@ interface PendingSpotWithProfile extends SupabaseSpotRow {
 export default function AdminReviewPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [accessChecked, setAccessChecked] = useState(false);
@@ -106,7 +108,7 @@ export default function AdminReviewPage() {
       setPendingSpots(spotsWithProfiles || []);
     } catch (error) {
       console.error("Failed to fetch pending spots:", error);
-      alert("Failed to load pending spots.");
+      toast.error("Failed to load pending spots.");
     }
   }
 
@@ -145,10 +147,10 @@ export default function AdminReviewPage() {
       // Remove from pending list
       setPendingSpots((prev) => prev.filter((s) => s.id !== spotId));
 
-      alert(`Spot ${action}d successfully!`);
+      toast.success(`Spot ${action}d successfully!`);
     } catch (error) {
       console.error(`Failed to ${action} spot:`, error);
-      alert(`Failed to ${action} spot.`);
+      toast.error(`Failed to ${action} spot.`);
     } finally {
       setActioningSpotId(null);
       setShowNoteModal(false);
@@ -331,7 +333,7 @@ export default function AdminReviewPage() {
 
       {/* Moderation note modal */}
       {showNoteModal && currentSpot && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-4-sm">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-4">
           <div className="w-full max-w-md rounded-2xl border border-line bg-elevated p-6 shadow-2xl">
             <h2 className="text-xl font-bold text-ink">
               {currentAction === "reject" ? "Reject" : "Flag"} Spot

@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/ui/Toast";
 import { supabase } from "@/lib/supabase";
 import { ensureProfile, type Profile } from "@/lib/profilesService";
 import { getFollowCounts } from "@/lib/followsService";
@@ -27,6 +28,7 @@ type Mode = "login" | "signup";
 export default function ProfilePage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
 
   // ---- Auth form state (signed-out only) ----
   const [mode, setMode] = useState<Mode>("login");
@@ -46,6 +48,8 @@ export default function ProfilePage() {
   const [followCounts, setFollowCounts] = useState<FollowCounts>({ followers: 0, following: 0 });
   const [clips, setClips] = useState<ProfileClip[]>([]);
   const [showAddClip, setShowAddClip] = useState(false);
+  const [clipToDelete, setClipToDelete] = useState<ProfileClip | null>(null);
+  const [deletingClip, setDeletingClip] = useState(false);
 
   useEffect(() => {
     if (!user) { setProfile(null); return; }
@@ -124,14 +128,24 @@ export default function ProfilePage() {
     setShowAddClip(false);
   }
 
-  async function handleDeleteClip(clip: ProfileClip) {
-    if (!confirm(`Delete "${clip.title ?? "this clip"}"?`)) return;
+  // Open the confirm modal for a clip (actual delete happens on confirm).
+  function handleDeleteClip(clip: ProfileClip) {
+    setClipToDelete(clip);
+  }
+
+  async function confirmDeleteClip() {
+    if (!clipToDelete) return;
+    setDeletingClip(true);
     try {
       const { deleteClip } = await import("@/lib/clipsService");
-      await deleteClip(clip.id);
-      setClips((prev) => prev.filter((c) => c.id !== clip.id));
-    } catch {
-      // Silent — UI already unchanged
+      await deleteClip(clipToDelete.id);
+      setClips((prev) => prev.filter((c) => c.id !== clipToDelete.id));
+      toast.success("Clip deleted.");
+      setClipToDelete(null);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't delete the clip.");
+    } finally {
+      setDeletingClip(false);
     }
   }
 
@@ -316,6 +330,42 @@ export default function ProfilePage() {
           </>
         )}
       </div>
+
+      {/* ---- Delete-clip confirm modal ---- */}
+      {clipToDelete && (
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 px-4"
+          onClick={() => !deletingClip && setClipToDelete(null)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-sm rounded-2xl border border-line bg-elevated p-6 shadow-2xl"
+          >
+            <h2 className="text-lg font-bold text-ink">Delete clip?</h2>
+            <p className="mt-2 text-sm text-muted">
+              &quot;{clipToDelete.title ?? "This clip"}&quot; will be removed
+              from your profile and any spot it&apos;s linked to. This
+              can&apos;t be undone.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setClipToDelete(null)}
+                disabled={deletingClip}
+                className="gs-btn-ghost px-4 disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteClip}
+                disabled={deletingClip}
+                className="rounded-xl bg-danger px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-danger/90 disabled:opacity-50"
+              >
+                {deletingClip ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

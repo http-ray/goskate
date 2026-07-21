@@ -29,6 +29,7 @@ import SpotHeatLayer from "./SpotHeatLayer";
 import AddClipModal from "@/components/ui/AddClipModal";
 import VisibleSpotsPanel, { FilterType } from "@/components/ui/VisibleSpotsPanel";
 import BottomLeftWidget from "@/components/ui/BottomLeftWidget";
+import { useToast } from "@/components/ui/Toast";
 import { fetchPublicSpots } from "@/lib/spotsService";
 
 // ---- Invisible cluster icon (no numbered bubbles) ----
@@ -76,6 +77,8 @@ const MOBILE_DEFAULT_ZOOM = 4;
 const MOBILE_MIN_ZOOM = 3;
 
 export default function MapView() {
+  const toast = useToast();
+
   // Keep a ref to the Leaflet map instance for imperative actions
   const mapRef = useRef<L.Map | null>(null);
 
@@ -174,12 +177,12 @@ export default function MapView() {
       },
       (err) => {
         console.warn("Geolocation error:", err.message);
-        alert(
+        toast.error(
           "Could not get your location. Make sure location access is enabled."
         );
       }
     );
-  }, []);
+  }, [toast]);
 
   // Expose locateMe on window so BottomLeftWidget can call it
   useEffect(() => {

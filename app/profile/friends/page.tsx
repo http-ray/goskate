@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/ui/Toast";
 import { getFollowing, getFollowers } from "@/lib/followsService";
 import ProfileCard from "@/components/ui/ProfileCard";
 import type { Profile } from "@/lib/profilesService";
@@ -18,6 +19,7 @@ type Tab = "following" | "followers";
 
 export default function FriendsPage() {
   const { user, loading: authLoading } = useAuth();
+  const toast = useToast();
 
   const [activeTab, setActiveTab] = useState<Tab>("following");
   const [following, setFollowing] = useState<Profile[]>([]);
@@ -36,9 +38,11 @@ export default function FriendsPage() {
         setFollowers(fwers);
         setLoaded(true);
       })
-      .catch(() => {})
+      .catch(() => {
+        toast.error("Couldn't load your connections. Please try again.");
+      })
       .finally(() => setLoading(false));
-  }, [authLoading, user, loaded]);
+  }, [authLoading, user, loaded, toast]);
 
   function handleFollowChange(profileId: string, nowFollowing: boolean) {
     if (!nowFollowing) {

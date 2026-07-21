@@ -11,8 +11,10 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { searchProfiles, type Profile } from "@/lib/profilesService";
 import ProfileCard from "@/components/ui/ProfileCard";
+import { useToast } from "@/components/ui/Toast";
 
 export default function UserSearchPage() {
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Profile[]>([]);
   const [searching, setSearching] = useState(false);
@@ -39,6 +41,7 @@ export default function UserSearchPage() {
       } catch {
         setResults([]);
         setHasSearched(true);
+        toast.error("Search failed. Please try again.");
       } finally {
         setSearching(false);
       }
@@ -47,7 +50,7 @@ export default function UserSearchPage() {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [query]);
+  }, [query, toast]);
 
   return (
     <div className="min-h-screen bg-black px-4 py-8 text-white">

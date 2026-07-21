@@ -8,6 +8,7 @@ import { getProfileByUsername, type Profile } from "@/lib/profilesService";
 import { getFollowCounts, getFollowStatus, followUser, unfollowUser } from "@/lib/followsService";
 import { getClipsForUser } from "@/lib/clipsService";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useToast } from "@/components/ui/Toast";
 import ClipCard from "@/components/ui/ClipCard";
 import type { ProfileClip, FollowCounts } from "@/types/social";
 
@@ -15,6 +16,7 @@ export default function PublicProfilePage() {
   const params = useParams();
   const username = typeof params.username === "string" ? params.username : "";
   const { user } = useAuth();
+  const toast = useToast();
 
   const [profile, setProfile] = useState<Profile | null | "not_found" | "private">(null);
   const [followCounts, setFollowCounts] = useState<FollowCounts>({ followers: 0, following: 0 });
@@ -71,7 +73,7 @@ export default function PublicProfilePage() {
         setFollowCounts((prev) => ({ ...prev, followers: prev.followers + 1 }));
       }
     } catch {
-      // Silently ignore
+      toast.error("Couldn't update follow. Please try again.");
     } finally {
       setFollowLoading(false);
     }

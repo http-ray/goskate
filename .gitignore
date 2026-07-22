@@ -41,4 +41,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# import script scratch data (retry cache, not committed)
+scripts/data/.import-dump.json
+
 #

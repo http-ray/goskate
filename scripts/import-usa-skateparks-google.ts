@@ -13,6 +13,12 @@
 //   npx tsx scripts/import-usa-skateparks-google.ts --state GA
 //   npx tsx scripts/import-usa-skateparks-google.ts --tile-size 2.0
 //
+// Retry a failed write WITHOUT re-fetching from Google:
+//   Every run saves its fetched rows to scripts/data/.import-dump.json
+//   BEFORE attempting the Supabase write (see --dump-file to change the
+//   path). If the write fails for any reason, fix the issue then run:
+//   npx tsx scripts/import-usa-skateparks-google.ts --from-file scripts/data/.import-dump.json
+//
 // Pass 1 — City-targeted:
 //   One Text Search per city in the embedded US_CITIES dataset
 //   (scripts/data/usCities.ts), e.g. "skatepark in Atlanta, GA".
@@ -47,6 +53,7 @@
 import { createClient } from "@supabase/supabase-js";
 import * as dotenv from "dotenv";
 import * as path from "path";
+import * as fs from "fs";
 import { US_CITIES } from "./data/usCities";
 import { STATE_NAMES, STATE_BBOXES } from "../lib/usStates";
 
@@ -75,6 +82,13 @@ const MAX_PAGES_PER_SEARCH = 3;
 const PAGE_SIZE = 20;
 const DEDUPE_RADIUS_M = 130;
 const DEFAULT_TILE_SIZE_DEG = 2.5;
+
+// Fetched-but-not-yet-written rows are always dumped here before the
+// Supabase write is attempted. If the write fails for any reason (a
+// schema mismatch, a network blip, etc.) the fetched data — which cost
+// real Google API quota — is never lost. Re-run with --from-file to
+// retry the write alone, with zero additional Google requests.
+const DEFAULT_DUMP_PATH = path.resolve(process.cwd(), "scripts/data/.import-dump.json");
 
 const GRID_SEARCH_TERMS = ["skatepark", "skate park", "skateboard park"] as const;
 
@@ -380,12 +394,15 @@ function placeToRow(place: GooglePlace, target: SearchTarget): SpotRow | null {
   };
 }
 
-async function upsertSpots(rows: SpotRow[]): Promise<{ inserted: number; skipped: number }> {
-  if (rows.length === 0) return { inserted: 0, skipped: 0 };
+async function upsertSpots(
+  rows: SpotRow[]
+): Promise<{ inserted: number; duplicates: number; failed: number }> {
+  if (rows.length === 0) return { inserted: 0, duplicates: 0, failed: 0 };
 
   const BATCH = 50;
   let inserted = 0;
-  let skipped = 0;
+  let duplicates = 0;
+  let failed = 0;
 
   for (let i = 0; i < rows.length; i += BATCH) {
     const batch = rows.slice(i, i + BATCH);
@@ -395,16 +412,19 @@ async function upsertSpots(rows: SpotRow[]): Promise<{ inserted: number; skipped
       .select("id");
 
     if (error) {
+      // A real write failure (schema mismatch, network, etc.) — NOT the
+      // same as "these rows already existed." Counted separately so the
+      // summary never hides a failure behind a benign-looking skip count.
       console.error(`  ❌ Batch ${Math.floor(i / BATCH) + 1} failed: ${error.message}`);
-      skipped += batch.length;
+      failed += batch.length;
     } else {
       const n = data?.length ?? 0;
       inserted += n;
-      skipped += batch.length - n;
+      duplicates += batch.length - n;
     }
   }
 
-  return { inserted, skipped };
+  return { inserted, duplicates, failed };
 }
 
 // ---- Shared pass runner ----
@@ -483,6 +503,8 @@ async function main() {
   const passFlag = (getFlag("--pass") ?? "both") as "city" | "grid" | "both";
   const stateFlag = getFlag("--state")?.toUpperCase();
   const tileSizeDeg = Number(getFlag("--tile-size") ?? DEFAULT_TILE_SIZE_DEG);
+  const fromFile = getFlag("--from-file");
+  const dumpPath = getFlag("--dump-file") ?? DEFAULT_DUMP_PATH;
 
   if (stateFlag && !STATE_NAMES[stateFlag]) {
     console.error(`❌ Unknown state code: ${stateFlag}`);
@@ -496,50 +518,76 @@ async function main() {
   console.log("🛹 GoSkate — USA Skatepark Import (Google Places, two-pass)");
   console.log("=".repeat(58));
   if (dryRun) console.log("⚠️  DRY RUN — nothing will be written to Supabase");
-  console.log(`Pass:      ${passFlag}`);
-  console.log(`State:     ${stateFlag ?? "all"}`);
-  console.log(`Tile size: ${tileSizeDeg}°`);
 
-  console.log("\nLoading existing spots for proximity de-duplication...");
-  const existingGrid = await loadExistingSpotGrid();
-  console.log("Done.");
+  let allRows: SpotRow[];
 
-  const seenOsmIds = new Set<string>();
-  const allRows: SpotRow[] = [];
-  let totalRequests = 0;
-  const passSummaries: string[] = [];
+  if (fromFile) {
+    // ---- Retry-from-file mode: skip Google entirely, just retry the write ----
+    if (!fs.existsSync(fromFile)) {
+      console.error(`❌ Dump file not found: ${fromFile}`);
+      process.exit(1);
+    }
+    allRows = JSON.parse(fs.readFileSync(fromFile, "utf8"));
+    console.log(`Loaded ${allRows.length} previously-fetched rows from ${fromFile}`);
+    console.log("(No Google Places requests made this run.)");
+  } else {
+    console.log(`Pass:      ${passFlag}`);
+    console.log(`State:     ${stateFlag ?? "all"}`);
+    console.log(`Tile size: ${tileSizeDeg}°`);
 
-  if (passFlag === "city" || passFlag === "both") {
-    const targets = buildCityTargets(stateFlag);
-    const stats = await runPass("City-targeted", targets, seenOsmIds, existingGrid, allRows);
-    totalRequests += stats.requests;
-    passSummaries.push(
-      `City pass:  ${stats.requests} requests, ${stats.rawPlaces} raw places, ${stats.newRows} new` +
-        (stats.failedTargets.length ? `, ${stats.failedTargets.length} failed targets` : "")
+    console.log("\nLoading existing spots for proximity de-duplication...");
+    const existingGrid = await loadExistingSpotGrid();
+    console.log("Done.");
+
+    const seenOsmIds = new Set<string>();
+    allRows = [];
+    let totalRequests = 0;
+    const passSummaries: string[] = [];
+
+    if (passFlag === "city" || passFlag === "both") {
+      const targets = buildCityTargets(stateFlag);
+      const stats = await runPass("City-targeted", targets, seenOsmIds, existingGrid, allRows);
+      totalRequests += stats.requests;
+      passSummaries.push(
+        `City pass:  ${stats.requests} requests, ${stats.rawPlaces} raw places, ${stats.newRows} new` +
+          (stats.failedTargets.length ? `, ${stats.failedTargets.length} failed targets` : "")
+      );
+    }
+
+    if (passFlag === "grid" || passFlag === "both") {
+      const targets = buildGridTargets(tileSizeDeg, stateFlag);
+      const stats = await runPass("Grid sweep", targets, seenOsmIds, existingGrid, allRows);
+      totalRequests += stats.requests;
+      passSummaries.push(
+        `Grid pass:  ${stats.requests} requests, ${stats.rawPlaces} raw places, ${stats.newRows} new` +
+          (stats.failedTargets.length ? `, ${stats.failedTargets.length} failed targets` : "")
+      );
+    }
+
+    console.log("\n" + "=".repeat(58));
+    console.log("📊 Summary");
+    console.log("=".repeat(58));
+    passSummaries.forEach((s) => console.log(s));
+    console.log(`\nTotal requests this run:    ${totalRequests}`);
+    console.log(`Total new unique parks:     ${allRows.length}`);
+    console.log(`Needs review (no name):     ${allRows.filter((r) => r.needs_review).length}`);
+    console.log(
+      "\n(Check this request count against your GCP billing console — Text Search Pro"
     );
+    console.log("gives 5,000 free requests/month; this run should be well under that.)");
   }
 
-  if (passFlag === "grid" || passFlag === "both") {
-    const targets = buildGridTargets(tileSizeDeg, stateFlag);
-    const stats = await runPass("Grid sweep", targets, seenOsmIds, existingGrid, allRows);
-    totalRequests += stats.requests;
-    passSummaries.push(
-      `Grid pass:  ${stats.requests} requests, ${stats.rawPlaces} raw places, ${stats.newRows} new` +
-        (stats.failedTargets.length ? `, ${stats.failedTargets.length} failed targets` : "")
+  // Always persist fetched rows to disk BEFORE attempting the Supabase
+  // write — this is what protects Google API spend if the write fails.
+  if (allRows.length > 0 && !fromFile) {
+    fs.mkdirSync(path.dirname(dumpPath), { recursive: true });
+    fs.writeFileSync(dumpPath, JSON.stringify(allRows, null, 2));
+    console.log(`\n💾 Saved ${allRows.length} fetched rows to ${dumpPath}`);
+    console.log(
+      `   If the Supabase write below fails, retry with zero extra Google requests:`
     );
+    console.log(`   npx tsx scripts/import-usa-skateparks-google.ts --from-file "${dumpPath}"`);
   }
-
-  console.log("\n" + "=".repeat(58));
-  console.log("📊 Summary");
-  console.log("=".repeat(58));
-  passSummaries.forEach((s) => console.log(s));
-  console.log(`\nTotal requests this run:    ${totalRequests}`);
-  console.log(`Total new unique parks:     ${allRows.length}`);
-  console.log(`Needs review (no name):     ${allRows.filter((r) => r.needs_review).length}`);
-  console.log(
-    "\n(Check this request count against your GCP billing console — Text Search Pro"
-  );
-  console.log("gives 5,000 free requests/month; this run should be well under that.)");
 
   if (dryRun) {
     console.log("\nDRY RUN — no rows written. Re-run without --dry-run to import.");
@@ -554,8 +602,19 @@ async function main() {
   console.log("\nUpserting to Supabase...");
   const upsertStats = await upsertSpots(allRows);
   console.log(`  ✅ Inserted: ${upsertStats.inserted}`);
-  console.log(`  ♻️  Skipped (already in Supabase): ${upsertStats.skipped}`);
-  console.log("\n🎉 Import complete! Re-run any time — existing rows are skipped.");
+  console.log(`  ♻️  Duplicates (already in Supabase): ${upsertStats.duplicates}`);
+
+  if (upsertStats.failed > 0) {
+    console.log(`  ❌ Failed to write: ${upsertStats.failed}`);
+    console.log(
+      `\n⚠️  Some rows failed to write — see the batch errors above for why.`
+    );
+    console.log(`   Your fetched data is safe at: ${dumpPath}`);
+    console.log(`   Fix the underlying issue, then retry with zero extra Google requests:`);
+    console.log(`   npx tsx scripts/import-usa-skateparks-google.ts --from-file "${dumpPath}"`);
+  } else {
+    console.log("\n🎉 Import complete! Re-run any time — existing rows are skipped.");
+  }
 }
 
 main().catch((err) => {

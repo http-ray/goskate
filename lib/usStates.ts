@@ -71,7 +71,7 @@ export const STATE_NAMES: Record<string, string> = {
 };
 
 // Approximate bounding boxes: [south, west, north, east].
-const STATE_BBOXES: Record<string, [number, number, number, number]> = {
+export const STATE_BBOXES: Record<string, [number, number, number, number]> = {
   AL: [30.14, -88.47, 35.01, -84.89],
   AK: [51.2, -179.15, 71.44, -129.98],
   AZ: [31.33, -114.82, 37.0, -109.04],

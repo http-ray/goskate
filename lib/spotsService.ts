@@ -136,11 +136,16 @@ export async function fetchOfficialSpots(): Promise<Spot[]> {
  *   - status = 'pending' (awaits moderation)
  *   - created_by = current authenticated user
  *
+ * `possibleDuplicate` should be set by the caller based on a prior
+ * checkNearbySpots() call — it flags the row for moderator attention
+ * in the admin review queue but does not block submission.
+ *
  * Throws if the user is not authenticated or if the insert fails.
  */
 export async function submitSpot(
   userId: string,
-  submission: SpotSubmission
+  submission: SpotSubmission,
+  possibleDuplicate = false
 ): Promise<string> {
   // Validate + cap user input before writing.
   const name = capText(submission.display_name, LIMITS.spotName);
@@ -174,6 +179,7 @@ export async function submitSpot(
       osm_name: null,
       osm_id: null,
       needs_review: false,
+      possible_duplicate: possibleDuplicate,
     })
     .select("id")
     .single();

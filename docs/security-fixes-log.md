@@ -43,13 +43,13 @@ The `with_check` column should no longer be empty.
 
 
 ## Duplicate detection doesn't flag submissions
-**What I found:** checkNearbySpots() correctly detects nearby spots on
-submission, but the result is never used to set possible_duplicate — the
-column exists in the schema but nothing writes to it. The user sees a
-warning, but no signal reaches moderators.
-**Why it mattered:** the moderation queue can't surface likely duplicates,
-even though the detection logic to support it already exists.
-**Root cause:** the check was wired into the submission flow but the last
-step — writing the flag — was never connected.
-**Status:** [Fixed — flag now set on detection] OR [Known limitation,
+**What I found:** `checkNearbySpots()` correctly detects nearby spots on submission, but the result was never used to set `possible_duplicate` — the column exists in the schema, and the admin review page already had UI ready to display it, but nothing ever wrote `true` to it. Every submitted spot showed `possible_duplicate = false`, even ones submitted 10 meters from an existing park.
+
+**Why it mattered:** the user submitting the spot saw a warning ("nearby spot(s) detected"), which implied something would happen on the backend as a result. Nothing did. A moderator reviewing the pending queue had no way to tell a likely duplicate apart from a brand new spot — they'd have to notice the overlap themselves by eye, which defeats the purpose of building the detection logic in the first place.
+
+**Root cause:** the check and the write were split across two different functions that never talked to each other. `checkNearbySpots()` (in `lib/spotsService.ts`) ran and returned results, but `submitSpot()` — the function that actually does the insert — had no parameter for that result and never included `possible_duplicate` in the row it wrote. The detection half of the feature was built; the half that acts on the result wasn't.
+
+**Fix:** `submitSpot()` now takes a third argument, `possibleDuplicate`, and includes it in the insert as `possible_duplicate` (`lib/spotsService.ts`). `AddSpotFlow.tsx` now passes `nearby.length > 0` from its existing `checkNearbySpots()` call straight into `submitSpot()`. Also corrected the success-screen copy, which previously said "this **may be** reviewed for duplicates" — now that the flag is actually wired up, it says the spot **was** flagged for moderator review, since that's now literally what happens. No changes were needed in `app/admin/review/page.tsx` — it already selected `possible_duplicate` via `select("*")` and already had a conditional "⚠️ Possible Duplicate" badge; that code was correct all along, it just never had real data to display.
+
+**How I verified it:** Added `lib/spotsService.test.ts`, which mocks the Supabase client and asserts on the actual insert payload: submitting with the duplicate flag set to `true` results in `possible_duplicate: true` in the row sent to Supabase, `false` results in `false`, and omitting the argument defaults to `false`. All 3 new tests pass, and the full suite (31 tests total) still passes. Confirmed the admin queue's existing render logic is correct by reading the code directly — I did not create a live test submission against the production database to see the badge render, since that would mean writing real test data into production, which I didn't want to do without asking first.
 documented for future work]

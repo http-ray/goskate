@@ -166,7 +166,7 @@ export default function AddSpotFlow({
         area_text: areaText.trim() || undefined,
       };
 
-      await submitSpot(user.id, submission);
+      await submitSpot(user.id, submission, nearby.length > 0);
 
       setStep("success");
     } catch (err) {
@@ -295,8 +295,8 @@ export default function AddSpotFlow({
             </p>
             {nearbySpots > 0 && (
               <p className="mt-3 text-xs text-warning">
-                ⚠️ {nearbySpots} nearby spot(s) detected — this may be reviewed for
-                duplicates.
+                ⚠️ {nearbySpots} nearby spot(s) detected — flagged as a possible
+                duplicate for moderator review.
               </p>
             )}
             <button

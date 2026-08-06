@@ -95,10 +95,12 @@ CREATE POLICY "Users can add clips"
   ON profile_clips FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
--- Users can update their own clips
+-- Users can update their own clips. WITH CHECK matches USING so a user
+-- can't reassign user_id to someone else's id as part of the update.
 CREATE POLICY "Users can update clips"
   ON profile_clips FOR UPDATE
-  USING (auth.uid() = user_id);
+  USING (auth.uid() = user_id)
+  WITH CHECK (auth.uid() = user_id);
 
 -- Users can delete their own clips
 CREATE POLICY "Users can delete clips"

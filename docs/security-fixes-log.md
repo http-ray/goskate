@@ -40,3 +40,16 @@ WHERE tablename = 'profile_clips' AND policyname = 'Users can update clips';
 ```
 
 The `with_check` column should no longer be empty.
+
+
+## Duplicate detection doesn't flag submissions
+**What I found:** checkNearbySpots() correctly detects nearby spots on
+submission, but the result is never used to set possible_duplicate — the
+column exists in the schema but nothing writes to it. The user sees a
+warning, but no signal reaches moderators.
+**Why it mattered:** the moderation queue can't surface likely duplicates,
+even though the detection logic to support it already exists.
+**Root cause:** the check was wired into the submission flow but the last
+step — writing the flag — was never connected.
+**Status:** [Fixed — flag now set on detection] OR [Known limitation,
+documented for future work]

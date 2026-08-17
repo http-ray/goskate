@@ -138,6 +138,12 @@ export default function LandingPage() {
             <Link href="/profile" className="transition-colors hover:text-muted">
               Account
             </Link>
+            <Link
+              href="/profile/feedback"
+              className="transition-colors hover:text-muted"
+            >
+              Feedback
+            </Link>
           </div>
         </div>
       </footer>

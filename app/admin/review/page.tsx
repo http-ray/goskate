@@ -5,12 +5,14 @@
 //
 // Access control: checks profiles.is_admin = true via Supabase.
 // The is_admin flag is enforced at the DB layer by RLS — only
-// rows with is_admin = true can SELECT or UPDATE pending spots.
+// rows with is_admin = true can SELECT or UPDATE any-status spots.
 //
-// Features:
-//   - List pending spots with submitter details
-//   - Approve, reject, or flag spots
-//   - Add moderation notes
+// Two tabs:
+//   - Pending: spots awaiting a first decision.
+//   - History: everything already decided (approved/rejected/
+//     flagged), most recently reviewed first. The same
+//     Approve/Reject/Flag actions work here too, so a past
+//     decision can be reversed — nothing about a status is final.
 // ============================================================
 
 import { useEffect, useState } from "react";
@@ -20,10 +22,19 @@ import { useToast } from "@/components/ui/Toast";
 import { supabase } from "@/lib/supabase";
 import type { SupabaseSpotRow } from "@/types/spot";
 
-interface PendingSpotWithProfile extends SupabaseSpotRow {
+interface SpotWithProfile extends SupabaseSpotRow {
   submitter_username?: string;
   submitter_avatar_url?: string;
+  reviewer_username?: string;
 }
+
+type View = "pending" | "history";
+
+const STATUS_STYLES: Record<string, string> = {
+  approved: "bg-success/15 text-success",
+  rejected: "bg-danger/15 text-danger",
+  flagged: "bg-flag/15 text-flag",
+};
 
 export default function AdminReviewPage() {
   const router = useRouter();
@@ -32,12 +43,14 @@ export default function AdminReviewPage() {
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [accessChecked, setAccessChecked] = useState(false);
-  const [pendingSpots, setPendingSpots] = useState<PendingSpotWithProfile[]>([]);
+  const [view, setView] = useState<View>("pending");
+  const [spots, setSpots] = useState<SpotWithProfile[]>([]);
+  const [loadingSpots, setLoadingSpots] = useState(false);
   const [actioningSpotId, setActioningSpotId] = useState<string | null>(null);
   const [moderationNote, setModerationNote] = useState("");
   const [showNoteModal, setShowNoteModal] = useState(false);
   const [currentAction, setCurrentAction] = useState<"approve" | "reject" | "flag" | null>(null);
-  const [currentSpot, setCurrentSpot] = useState<PendingSpotWithProfile | null>(null);
+  const [currentSpot, setCurrentSpot] = useState<SpotWithProfile | null>(null);
 
   // ---- Check admin access via profiles.is_admin ----
   useEffect(() => {
@@ -69,25 +82,36 @@ export default function AdminReviewPage() {
     })();
   }, [authLoading, user, router]);
 
-  // ---- Fetch pending spots ----
+  // ---- Fetch spots for the active tab ----
   useEffect(() => {
     if (!accessChecked || !isAdmin) return;
 
-    fetchPendingSpots();
-  }, [accessChecked, isAdmin]);
+    fetchSpots(view);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accessChecked, isAdmin, view]);
 
-  async function fetchPendingSpots() {
+  async function fetchSpots(currentView: View) {
+    setLoadingSpots(true);
     try {
-      const { data: spots, error: spotsError } = await supabase
-        .from("spots")
-        .select("*")
-        .eq("status", "pending")
-        .order("created_at", { ascending: false });
+      const query = supabase.from("spots").select("*");
+
+      const { data: spotRows, error: spotsError } =
+        currentView === "pending"
+          ? await query.eq("status", "pending").order("created_at", { ascending: false })
+          : await query
+              .in("status", ["approved", "rejected", "flagged"])
+              .order("reviewed_at", { ascending: false, nullsFirst: false });
 
       if (spotsError) throw spotsError;
 
-      // Fetch submitter profiles
-      const userIds = spots?.map((s) => s.created_by).filter(Boolean) || [];
+      // Fetch submitter + reviewer profiles in one pass
+      const userIds = [
+        ...new Set(
+          (spotRows || [])
+            .flatMap((s) => [s.created_by, s.reviewed_by])
+            .filter(Boolean)
+        ),
+      ];
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select("id, username, avatar_url")
@@ -95,20 +119,23 @@ export default function AdminReviewPage() {
 
       if (profilesError) throw profilesError;
 
-      // Merge profiles into spots
-      const spotsWithProfiles = spots?.map((spot) => {
-        const profile = profiles?.find((p) => p.id === spot.created_by);
-        return {
-          ...spot,
-          submitter_username: profile?.username,
-          submitter_avatar_url: profile?.avatar_url,
-        };
-      });
+      const profileById = new Map((profiles || []).map((p) => [p.id, p]));
 
-      setPendingSpots(spotsWithProfiles || []);
+      const spotsWithProfiles = (spotRows || []).map((spot) => ({
+        ...spot,
+        submitter_username: profileById.get(spot.created_by)?.username,
+        submitter_avatar_url: profileById.get(spot.created_by)?.avatar_url,
+        reviewer_username: spot.reviewed_by
+          ? profileById.get(spot.reviewed_by)?.username
+          : undefined,
+      }));
+
+      setSpots(spotsWithProfiles);
     } catch (error) {
-      console.error("Failed to fetch pending spots:", error);
-      toast.error("Failed to load pending spots.");
+      console.error("Failed to fetch spots:", error);
+      toast.error("Failed to load spots.");
+    } finally {
+      setLoadingSpots(false);
     }
   }
 
@@ -123,19 +150,15 @@ export default function AdminReviewPage() {
     setActioningSpotId(spotId);
 
     try {
-      const updateData: Record<string, unknown> = {
+      const status: SupabaseSpotRow["status"] =
+        action === "approve" ? "approved" : action === "reject" ? "rejected" : "flagged";
+
+      const updateData = {
+        status,
         reviewed_by: user.id,
         reviewed_at: new Date().toISOString(),
         moderation_notes: note || null,
       };
-
-      if (action === "approve") {
-        updateData.status = "approved";
-      } else if (action === "reject") {
-        updateData.status = "rejected";
-      } else if (action === "flag") {
-        updateData.status = "flagged";
-      }
 
       const { error } = await supabase
         .from("spots")
@@ -144,8 +167,24 @@ export default function AdminReviewPage() {
 
       if (error) throw error;
 
-      // Remove from pending list
-      setPendingSpots((prev) => prev.filter((s) => s.id !== spotId));
+      if (view === "pending") {
+        // Decided for the first time — it leaves the pending queue.
+        setSpots((prev) => prev.filter((s) => s.id !== spotId));
+      } else {
+        // Already in history — update it in place so a reversed
+        // decision is visible immediately without a refetch.
+        setSpots((prev) =>
+          prev.map((s) =>
+            s.id === spotId
+              ? {
+                  ...s,
+                  ...updateData,
+                  reviewer_username: user.email?.split("@")[0] || s.reviewer_username,
+                }
+              : s
+          )
+        );
+      }
 
       toast.success(`Spot ${action}d successfully!`);
     } catch (error) {
@@ -161,7 +200,7 @@ export default function AdminReviewPage() {
   }
 
   const openNoteModal = (
-    spot: PendingSpotWithProfile,
+    spot: SpotWithProfile,
     action: "approve" | "reject" | "flag"
   ) => {
     setCurrentSpot(spot);
@@ -195,7 +234,8 @@ export default function AdminReviewPage() {
             <div>
               <h1 className="text-2xl font-bold">Admin Review</h1>
               <p className="mt-1 text-sm text-muted">
-                {pendingSpots.length} pending spot{pendingSpots.length !== 1 ? "s" : ""}
+                {spots.length} {view === "pending" ? "pending" : "reviewed"} spot
+                {spots.length !== 1 ? "s" : ""}
               </p>
             </div>
             <div className="flex gap-2">
@@ -213,18 +253,44 @@ export default function AdminReviewPage() {
               </button>
             </div>
           </div>
+
+          {/* Tabs */}
+          <div className="mt-5 flex gap-1 rounded-xl bg-elevated p-1 w-fit">
+            <button
+              onClick={() => setView("pending")}
+              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors ${
+                view === "pending" ? "bg-accent text-on-accent" : "text-muted hover:text-ink"
+              }`}
+            >
+              Pending
+            </button>
+            <button
+              onClick={() => setView("history")}
+              className={`rounded-lg px-4 py-1.5 text-sm font-semibold transition-colors ${
+                view === "history" ? "bg-accent text-on-accent" : "text-muted hover:text-ink"
+              }`}
+            >
+              History
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Pending spots list */}
+      {/* Spot list */}
       <div className="mx-auto max-w-7xl px-4 py-8">
-        {pendingSpots.length === 0 ? (
+        {loadingSpots ? (
           <div className="rounded-2xl border border-line-soft bg-surface px-8 py-12 text-center">
-            <p className="text-muted">No pending spots to review.</p>
+            <p className="text-muted">Loading...</p>
+          </div>
+        ) : spots.length === 0 ? (
+          <div className="rounded-2xl border border-line-soft bg-surface px-8 py-12 text-center">
+            <p className="text-muted">
+              {view === "pending" ? "No pending spots to review." : "No reviewed spots yet."}
+            </p>
           </div>
         ) : (
           <div className="space-y-4">
-            {pendingSpots.map((spot) => (
+            {spots.map((spot) => (
               <div
                 key={spot.id}
                 className="rounded-2xl border border-line-soft bg-surface p-6"
@@ -247,7 +313,18 @@ export default function AdminReviewPage() {
                       )}
 
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold">{spot.display_name}</h3>
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-lg font-semibold">{spot.display_name}</h3>
+                          {view === "history" && (
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
+                                STATUS_STYLES[spot.status] || "bg-elevated text-faint"
+                              }`}
+                            >
+                              {spot.status}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-muted">
                           by <span className="text-ink">{spot.submitter_username || "Unknown"}</span>
                           {" • "}
@@ -306,27 +383,44 @@ export default function AdminReviewPage() {
                         <span className="text-ink">{spot.area_text}</span>
                       </div>
                     )}
+
+                    {view === "history" && (spot.reviewed_at || spot.moderation_notes) && (
+                      <div className="rounded-2xl border border-line-soft bg-field p-3 text-sm">
+                        {spot.reviewed_at && (
+                          <p className="text-faint">
+                            Reviewed by{" "}
+                            <span className="text-ink">{spot.reviewer_username || "an admin"}</span>{" "}
+                            on {new Date(spot.reviewed_at).toLocaleString()}
+                          </p>
+                        )}
+                        {spot.moderation_notes && (
+                          <p className="mt-1 text-muted">
+                            <span className="text-faint">Note:</span> {spot.moderation_notes}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Action buttons */}
                   <div className="flex flex-row gap-2 md:flex-col">
                     <button
                       onClick={() => handleAction(spot.id, "approve")}
-                      disabled={actioningSpotId === spot.id}
+                      disabled={actioningSpotId === spot.id || spot.status === "approved"}
                       className="flex-1 rounded-xl bg-success px-4 py-2 text-sm font-semibold text-on-accent transition-colors hover:bg-success/90 disabled:opacity-50 md:flex-none"
                     >
                       Approve
                     </button>
                     <button
                       onClick={() => openNoteModal(spot, "reject")}
-                      disabled={actioningSpotId === spot.id}
+                      disabled={actioningSpotId === spot.id || spot.status === "rejected"}
                       className="flex-1 rounded-xl border border-danger/30 bg-danger/15 px-4 py-2 text-sm font-semibold text-danger transition-colors hover:bg-danger/25 disabled:opacity-50 md:flex-none"
                     >
                       Reject
                     </button>
                     <button
                       onClick={() => openNoteModal(spot, "flag")}
-                      disabled={actioningSpotId === spot.id}
+                      disabled={actioningSpotId === spot.id || spot.status === "flagged"}
                       className="flex-1 rounded-xl border border-flag/30 bg-flag/15 px-4 py-2 text-sm font-semibold text-flag transition-colors hover:bg-flag/25 disabled:opacity-50 md:flex-none"
                     >
                       Flag

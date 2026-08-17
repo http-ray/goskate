@@ -243,7 +243,7 @@ export default async function SpotPage({ params }: SpotPageProps) {
 
       {/* Get Directions */}
       <a
-        href={`https://www.google.com/maps/dir/?api=1&destination=${spot.latitude},${spot.longitude}&travelmode=walking`}
+        href={`https://www.google.com/maps/dir/?api=1&destination=${spot.latitude},${spot.longitude}&travelmode=driving`}
         target="_blank"
         rel="noopener noreferrer"
         className="block w-full rounded-xl bg-blue-500 py-3 text-center text-sm font-bold text-white transition-colors hover:bg-blue-600"

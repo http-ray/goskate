@@ -83,6 +83,11 @@ export default function LandingPage() {
             Create an account
           </Link>
         </div>
+
+        <p className="mt-6 text-xs text-faint">
+          🇺🇸 Coast to coast and everywhere between — charting every state,
+          one spot at a time.
+        </p>
       </section>
 
       {/* ---- Features ---- */}

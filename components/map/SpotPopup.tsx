@@ -12,7 +12,7 @@ export default function SpotPopup({ spot, onAddClip }: SpotPopupProps) {
   const router = useRouter();
 
   const handleDirections = () => {
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${spot.latitude},${spot.longitude}&travelmode=walking`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${spot.latitude},${spot.longitude}&travelmode=driving`;
     window.open(url, "_blank", "noopener,noreferrer");
   };
 

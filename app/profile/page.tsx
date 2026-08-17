@@ -90,11 +90,12 @@ export default function ProfilePage() {
             data: {
               username: username.trim() || email.split("@")[0],
             },
+            emailRedirectTo: `${window.location.origin}/profile`,
           },
         });
         if (signUpError) throw signUpError;
         setMessage(
-          "Account created. If email confirmation is enabled in Supabase, check your inbox before logging in."
+          "Account created. Check your email to confirm before logging in."
         );
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });

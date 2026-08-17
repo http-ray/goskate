@@ -83,7 +83,7 @@ export default function ProfilePage() {
 
     try {
       if (mode === "signup") {
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -94,9 +94,22 @@ export default function ProfilePage() {
           },
         });
         if (signUpError) throw signUpError;
-        setMessage(
-          "Account created. Check your email to confirm before logging in."
-        );
+
+        // Supabase deliberately doesn't error on a duplicate email (avoids
+        // leaking which emails are registered), but it does return an
+        // empty identities array instead of a new one — that's the
+        // documented signal to distinguish "new account" from "this
+        // email already exists" without a separate lookup.
+        const isExistingAccount = (signUpData.user?.identities?.length ?? 0) === 0;
+
+        if (isExistingAccount) {
+          setMode("login");
+          setError("An account with this email already exists. Log in instead.");
+        } else {
+          setMessage(
+            "Account created. Check your email to confirm before logging in."
+          );
+        }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
         if (signInError) throw signInError;

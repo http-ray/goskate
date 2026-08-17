@@ -2,7 +2,7 @@
 // Settings Page — /profile/settings
 //
 // Working features: Edit Profile, Change Password, Profile
-// Visibility toggle, Send Feedback (email), Log Out.
+// Visibility toggle, Send Feedback (in-app), Log Out.
 // Location Sharing and Blocked Users remain "coming soon".
 // ============================================================
 
@@ -17,8 +17,6 @@ import { useToast } from "@/components/ui/Toast";
 import { supabase } from "@/lib/supabase";
 import { getProfile, updateProfile } from "@/lib/profilesService";
 
-// Feedback is sent by opening the user's email client — no backend needed.
-const FEEDBACK_EMAIL = "raymxs7@gmail.com";
 const MIN_PASSWORD_LENGTH = 8;
 
 export default function SettingsPage() {
@@ -210,12 +208,7 @@ export default function SettingsPage() {
 
       {/* ---- Help / About ---- */}
       <SettingsSection title="Help / About">
-        <SettingsRow
-          icon="📝"
-          label="Send Feedback"
-          href={`mailto:${FEEDBACK_EMAIL}?subject=${encodeURIComponent("GoSkate Feedback")}`}
-          external
-        />
+        <SettingsRow icon="📝" label="Send Feedback" href="/profile/feedback" />
         <SettingsRow
           icon="ℹ️"
           label="About GoSkate"

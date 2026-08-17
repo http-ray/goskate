@@ -18,6 +18,7 @@ export const LIMITS = {
   displayName: 60,
   bio: 300,
   localPark: 120,
+  feedbackMessage: 2000,
 } as const;
 
 // Usernames: letters, numbers, and . _ - only. 3–30 chars.

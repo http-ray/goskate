@@ -85,8 +85,8 @@ export default function LandingPage() {
         </div>
 
         <p className="mt-6 text-xs text-faint">
-          🇺🇸 Coast to coast and everywhere between — charting every state,
-          one spot at a time.
+          🇺🇸 coast to coast, spot by spot — mapping every state, one push at
+          a time.
         </p>
       </section>
 

@@ -28,14 +28,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let isMounted = true;
-
-    supabase.auth.getSession().then(({ data }) => {
-      if (!isMounted) return;
-      setSession(data.session);
-      setLoading(false);
-    });
-
+    // onAuthStateChange alone is enough: it fires once immediately with
+    // the current session (an INITIAL_SESSION event) when subscribed, then
+    // again on every future change. A separate getSession() call used to
+    // run in parallel with this — two independent writers to the same
+    // state, racing on load order. Right after an email-confirmation
+    // redirect (where the client still has to parse the token out of the
+    // URL) that race could resolve session state twice in quick
+    // succession, causing anything keyed on the user object (like
+    // ensureProfile()) to run twice concurrently.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
@@ -44,7 +45,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     return () => {
-      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);

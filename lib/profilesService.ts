@@ -126,7 +126,18 @@ export async function ensureProfile(user: User): Promise<Profile> {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    // 23505 = unique_violation. Auth state can settle in two steps right
+    // after email confirmation (an initial session, then a follow-up
+    // onAuthStateChange once the URL token finishes parsing), which can
+    // call ensureProfile twice before the first insert lands. The other
+    // call already created the row — this isn't a real failure.
+    if (error.code === "23505") {
+      const created = await getProfile(user.id);
+      if (created) return created;
+    }
+    throw error;
+  }
 
   return data as Profile;
 }

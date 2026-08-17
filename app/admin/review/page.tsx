@@ -198,12 +198,20 @@ export default function AdminReviewPage() {
                 {pendingSpots.length} pending spot{pendingSpots.length !== 1 ? "s" : ""}
               </p>
             </div>
-            <button
-              onClick={() => router.push("/map")}
-              className="rounded-xl border border-line bg-elevated px-4 py-2 text-sm text-ink transition-colors hover:bg-line/40"
-            >
-              Back to Map
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => router.push("/admin/feedback")}
+                className="rounded-xl border border-line bg-elevated px-4 py-2 text-sm text-ink transition-colors hover:bg-line/40"
+              >
+                Feedback
+              </button>
+              <button
+                onClick={() => router.push("/map")}
+                className="rounded-xl border border-line bg-elevated px-4 py-2 text-sm text-ink transition-colors hover:bg-line/40"
+              >
+                Back to Map
+              </button>
+            </div>
           </div>
         </div>
       </div>

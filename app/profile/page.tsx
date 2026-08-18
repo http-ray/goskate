@@ -23,7 +23,8 @@ import ClipCard from "@/components/ui/ClipCard";
 import AddClipForm from "@/components/ui/AddClipForm";
 import type { ProfileClip, FollowCounts } from "@/types/social";
 
-type Mode = "login" | "signup";
+type Mode = "login" | "signup" | "forgot";
+const MIN_PASSWORD_LENGTH = 8;
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -34,6 +35,7 @@ export default function ProfilePage() {
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [username, setUsername] = useState("");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -82,7 +84,26 @@ export default function ProfilePage() {
     setSaving(true);
 
     try {
-      if (mode === "signup") {
+      if (mode === "forgot") {
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/profile/reset-password`,
+        });
+        if (resetError) throw resetError;
+        // Deliberately generic — Supabase doesn't reveal whether the email
+        // is registered here either, so neither should we.
+        setMessage("If an account exists for that email, a reset link has been sent.");
+      } else if (mode === "signup") {
+        if (password.length < MIN_PASSWORD_LENGTH) {
+          setError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters.`);
+          setSaving(false);
+          return;
+        }
+        if (password !== confirmPassword) {
+          setError("Passwords don't match.");
+          setSaving(false);
+          return;
+        }
+
         const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -186,36 +207,85 @@ export default function ProfilePage() {
           </Link>
 
           <div className="rounded-2xl border border-line bg-surface p-5 shadow-2xl">
-            <p className="text-xs uppercase tracking-[0.2em] text-faint">GoSkate Account</p>
-            <h1 className="mt-2 text-2xl font-bold">Sign in or create an account</h1>
-            <p className="mt-2 text-sm leading-6 text-muted">
-              Save spots, post clips, and follow other skaters.
-            </p>
+            {mode === "forgot" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("login");
+                    setError(null);
+                    setMessage(null);
+                  }}
+                  className="text-xs text-muted hover:text-ink"
+                >
+                  ← Back to login
+                </button>
+                <h1 className="mt-2 text-2xl font-bold">Reset your password</h1>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  Enter the email on your account and we&apos;ll send you a reset link.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-xs uppercase tracking-[0.2em] text-faint">GoSkate Account</p>
+                <h1 className="mt-2 text-2xl font-bold">Sign in or create an account</h1>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  Save spots, post clips, and follow other skaters.
+                </p>
 
-            <div className="mt-5 grid grid-cols-2 rounded-xl bg-field p-1 text-sm">
-              <button
-                type="button"
-                onClick={() => setMode("login")}
-                className={`rounded-xl px-3 py-2 transition-colors ${
-                  mode === "login" ? "bg-accent text-on-accent" : "text-muted"
-                }`}
-              >
-                Log in
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("signup")}
-                className={`rounded-xl px-3 py-2 transition-colors ${
-                  mode === "signup" ? "bg-accent text-on-accent" : "text-muted"
-                }`}
-              >
-                Sign up
-              </button>
-            </div>
+                <div className="mt-5 grid grid-cols-2 rounded-xl bg-field p-1 text-sm">
+                  <button
+                    type="button"
+                    onClick={() => setMode("login")}
+                    className={`rounded-xl px-3 py-2 transition-colors ${
+                      mode === "login" ? "bg-accent text-on-accent" : "text-muted"
+                    }`}
+                  >
+                    Log in
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMode("signup")}
+                    className={`rounded-xl px-3 py-2 transition-colors ${
+                      mode === "signup" ? "bg-accent text-on-accent" : "text-muted"
+                    }`}
+                  >
+                    Sign up
+                  </button>
+                </div>
+              </>
+            )}
 
             <form onSubmit={handleAuthSubmit} className="mt-5 space-y-4">
               <Field label="Email" value={email} onChange={setEmail} type="email" placeholder="you@example.com" />
-              <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="••••••••" />
+
+              {mode !== "forgot" && (
+                <Field label="Password" value={password} onChange={setPassword} type="password" placeholder="••••••••" />
+              )}
+
+              {mode === "login" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode("forgot");
+                    setError(null);
+                    setMessage(null);
+                  }}
+                  className="text-xs text-muted hover:text-ink"
+                >
+                  Forgot password?
+                </button>
+              )}
+
+              {mode === "signup" && (
+                <Field
+                  label="Confirm password"
+                  value={confirmPassword}
+                  onChange={setConfirmPassword}
+                  type="password"
+                  placeholder="••••••••"
+                />
+              )}
 
               {mode === "signup" && (
                 <Field label="Username" value={username} onChange={setUsername} placeholder="your skate name" prefix="@" />
@@ -237,7 +307,13 @@ export default function ProfilePage() {
                 disabled={saving}
                 className="w-full gs-btn-primary disabled:opacity-60"
               >
-                {saving ? "Working..." : mode === "signup" ? "Create account" : "Log in"}
+                {saving
+                  ? "Working..."
+                  : mode === "signup"
+                  ? "Create account"
+                  : mode === "forgot"
+                  ? "Send reset link"
+                  : "Log in"}
               </button>
             </form>
           </div>

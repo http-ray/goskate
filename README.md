@@ -38,6 +38,8 @@ Built with Next.js (App Router), TypeScript, Tailwind CSS 4, Leaflet, and Supaba
 
 **Auth & moderation**
 - Supabase email/password auth with custom SMTP (Resend) for confirmation emails; duplicate-signup attempts are detected and redirected to login instead of showing a misleading "account created" message
+- Confirm-password field on signup, checked client-side before the request fires
+- Forgot password flow (`/profile/reset-password`) — deliberately generic response message so it doesn't reveal whether an email is registered, matching the same anti-enumeration approach as the duplicate-signup check
 - Profile auto-created on first login, with race-safe handling if auth state settles in two steps (can happen right after an email-confirmation redirect)
 - Admin moderation queue at `/admin/review` — Pending tab for first-time decisions, History tab for everything already decided, with the same Approve/Reject/Flag actions available on history items so a past call can be reversed
 - All admin gating (`profiles.is_admin`) is enforced at the RLS layer, not just client-side checks
@@ -100,7 +102,7 @@ Never commit `.env.local`. The Supabase service role key is never used in this p
 app/                          Pages + routes (Next.js App Router)
   page.tsx                    Landing page (public front door)
   map/                        Full-screen map
-  profile/                    Auth hub, edit, friends (follow lists), settings, feedback
+  profile/                    Auth hub, edit, friends (follow lists), settings, feedback, reset-password
   profile/[username]/         Public profile page
   spots/[id]/                 Spot detail page (info + public clips)
   users/search/                User search
